@@ -216,7 +216,8 @@ export class Newsroom extends DurableObject {
     if (!this.env.AI || budget.calls >= AI_DAILY_CALLS) return out;
     budget.calls++;
     this.put('ai', budget);
-    const batch = events.slice(0, AI_MAX_EVENTS);
+    const batch = events.filter((e) => !e.noAI).slice(0, AI_MAX_EVENTS);
+    if (!batch.length) return out;
     const recent = this.sql.exec('SELECT headline FROM posts ORDER BY id DESC LIMIT 6').toArray().map((r) => r.headline);
     const names = new Set();
     for (const r of Object.values(cur.races)) for (const c of [r.a, r.b]) if (c?.name) names.add(c.name);

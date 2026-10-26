@@ -8,6 +8,8 @@ export const CALLED = new Set(['projected', 'decided']);
 export const POLLS_CLOSE = Date.parse('2026-10-26T20:00:00-04:00');
 const BOARD_SHORT = { 'Toronto District School Board': 'TDSB', 'Toronto Catholic District School Board': 'TCDSB', 'Conseil scolaire Viamonde': 'Viamonde', 'Conseil scolaire catholique MonAvenir': 'MonAvenir' };
 const MILESTONES = [0.25, 0.5, 0.75, 0.9, 1];
+// Before polls close: a short post on each of these (Toronto time), so the feed isn't silent all day.
+const PRE_CLOSE = ['2026-10-26T16:00:00-04:00', '2026-10-26T17:00:00-04:00', '2026-10-26T18:00:00-04:00', '2026-10-26T19:00:00-04:00', '2026-10-26T19:30:00-04:00'].map(Date.parse);
 
 const int = (v) => { const n = parseInt(String(v ?? '').replace(/,/g, ''), 10); return Number.isFinite(n) ? n : 0; };
 const fmt = (n) => Math.round(n).toLocaleString('en-CA');
@@ -113,6 +115,16 @@ export function diff(prev, cur, now, posted = new Set()) {
   cur.lc = { ...(prev?.lc || {}) }; // when each race last had a lead-change post
   const add = (e) => { if (!posted.has(e.id)) { ev.push(e); posted.add(e.id); } };
   if (now >= POLLS_CLOSE) add({ id: 'polls-closed', kind: 'polls-closed', facts: { closedAt: '8 p.m.' } });
+  // Only the latest pre-close mark that has passed, so a late start doesn't post a backlog.
+  const mark = now < POLLS_CLOSE ? PRE_CLOSE.filter((t) => t <= now).pop() : null;
+  if (mark && cur) {
+    const council = Object.values(cur.races).filter((r) => r.kind === 'council');
+    add({ id: `pre-close-${mark}`, kind: 'pre-close', noAI: true, facts: {
+      minutesLeft: Math.round((POLLS_CLOSE - mark) / 60000), electors: cur.totalVoters, mayorCandidates: cur.races.mayor?.n || 0,
+      councilCandidates: council.reduce((a, r) => a + r.n, 0), wards: council.length,
+      trusteeRaces: Object.values(cur.races).filter((r) => r.kind === 'trustee').length,
+    } });
+  }
   if (!prev || !cur) return ev;
 
   const city = { pollsIn: cur.rec, polls: cur.polls, pctPollsIn: cur.polls ? Math.round((cur.rec / cur.polls) * 100) : 0, mayor: facts(cur.races.mayor) };
@@ -163,6 +175,18 @@ export function template(e) {
   const f = e.facts;
   const L = f.leader, S = f.second;
   switch (e.kind) {
+    case 'pre-close': {
+      const h = f.minutesLeft / 60;
+      const left = f.minutesLeft === 30 ? 'Thirty minutes' : `${['', 'One hour', 'Two hours', 'Three hours', 'Four hours'][h] || `${h} hours`}`;
+      const lines = [
+        `${fmt(f.electors)} people are on the voters' list, choosing a mayor from ${f.mayorCandidates} candidates.`,
+        `${f.councilCandidates} candidates are running for council across ${f.wards} wards, plus ${f.trusteeRaces} school trustee races.`,
+        'Results will start appearing here after 8 p.m., ward by ward, as the City reports them.',
+        `There are ${f.mayorCandidates} names on the ballot for mayor, and ${f.councilCandidates} running for council.`,
+        'Once polls close, updates will appear here as the City reports results.',
+      ];
+      return { headline: `${left} until polls close`, body: `Voting is open until 8 p.m. ${lines[Math.round(4 - h) % lines.length] || lines[4]}` };
+    }
     case 'polls-closed': return pick(e.id, [
       { headline: 'Polls are closed across Toronto', body: 'Voting ended at 8 p.m. The first unofficial results should start arriving from the City shortly.' },
     ]);

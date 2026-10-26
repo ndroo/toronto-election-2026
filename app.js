@@ -1020,7 +1020,7 @@
   let feedAt = 0, feedLib = null, demoSnap = null, demoPosted = new Set(), demoId = 0;
   const feedTime = (t) => new Date(t).toLocaleTimeString('en-CA', { timeZone: TZ, hour: 'numeric', minute: '2-digit' });
   const KIND = {
-    'polls-closed': ['Polls closed', ''], 'first-results': ['First results', ''], milestone: ['Count', ''],
+    'pre-close': ['Polls open', ''], 'polls-closed': ['Polls closed', ''], 'first-results': ['First results', ''], milestone: ['Count', ''],
     'ward-started': ['Counting begins', ''], 'wards-started': ['Counting begins', ''], 'ward-finished': ['Count complete', ''],
     'lead-change': ['Lead change', 'k-lead'], 'close-race': ['Close race', 'k-close'], call: ['Race call', 'k-call'], 'trustee-calls': ['Trustee calls', 'k-call'],
   };
