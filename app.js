@@ -76,7 +76,7 @@
   let userPinned = false; // set once the person picks a ward themselves this visit
   let hover = null;
   let sort = { key: 'num', dir: 1 };
-  let tab = { school: 'wards' }[hash.get('t')] || (['ward', 'wards', 'method'].includes(hash.get('t')) ? hash.get('t') : 'ward');
+  let tab = { school: 'wards' }[hash.get('t')] || (['ward', 'wards', 'method', 'feed'].includes(hash.get('t')) ? hash.get('t') : 'ward');
   let racesView = hash.get('t') === 'school' ? 3 : 'council'; // 'council' or a school board office id
   // Ward tabs the person has opened (up to 5), remembered on this device.
   const MAX_WARD_TABS = 5;
@@ -231,7 +231,7 @@
     const ex = (st) => `<span class="call call-${st}">${CALL_LABEL[st]}</span>`;
     const sections = [
       ['m-disclaimer', 'Disclaimer'], ['m-calls', 'Race calls'], ['m-data', 'Where the numbers come from'], ['m-calc', 'How each number is worked out'],
-      ['m-map', 'Map colours'], ['m-photos', 'Candidate photos'], ['m-location', 'Your location'], ['m-privacy', 'Privacy'], ['m-limits', 'Limits'],
+      ['m-map', 'Map colours'], ['m-photos', 'Candidate photos'], ['m-location', 'Your location'], ['m-incumbents', 'Incumbents'], ['m-privacy', 'Privacy'], ['m-limits', 'Limits'],
     ];
     $('#method').innerHTML = `
       <h2>Methodology</h2>
@@ -279,8 +279,8 @@
       </section>
 
       <section id="m-map"><h3>Map colours</h3>
-      <p><b>Mayor leader:</b> the top three mayoral candidates city-wide each get a colour, and keep it even if their ranks change. A ward led by anyone else, or tied, is grey. Darker means a wider lead in that ward (full strength at 30 points or more).</p>
-      <p><b>Council margin:</b> darker blue means a wider lead for the council leader (full strength at 40 points). <b>Reporting</b> and <b>Turnout:</b> darker means higher (turnout full strength at 60%).</p>
+      <p><b>Mayor leader:</b> the top three mayoral candidates city-wide each get a colour, and keep it even if their ranks change. A ward led by anyone else, or tied, is grey. A stronger colour means a wider lead in that ward (full strength at 30 points or more).</p>
+      <p><b>Council margin:</b> a stronger blue means a wider lead for the council leader (full strength at 40 points). <b>Reporting</b> and <b>Turnout:</b> a stronger blue means higher (turnout full strength at 60%).</p>
       <p>Ward boundaries: <a href="https://open.toronto.ca/dataset/city-wards/">Toronto Open Data</a>, 25-ward model, simplified for the web.</p>
       </section>
 
@@ -291,6 +291,10 @@
 
       <section id="m-location"><h3>Your location</h3>
       <p>"Find my ward" asks your browser for your location once, and matches it against the ward map on your own device. Your location is never sent to us or anyone else, and it isn't stored. Only your ward number is saved in your browser, so the page can open on your ward next time. Clear your browser's site data to forget it. Ward edges on the map are simplified, so if you're right on a boundary, double-check your ward with the <a href="https://www.toronto.ca/city-government/elections/">City</a>.</p>
+      </section>
+
+      <section id="m-incumbents"><h3>Incumbents</h3>
+      <p>The City's results feed doesn't say who already holds each seat, so "Incumbent" labels come from a list made for this page from the City's <a href="https://www.toronto.ca/city-government/council/members-of-council/">Members of Council</a> page and news coverage, including by-elections since 2022. They cover the mayor and council only. "Open seat" means the sitting councillor isn't running again in that ward; "Cllr" marks a sitting councillor running for a different seat. "Re-elected" and "unseats" in the live updates follow the same race calls as the rest of the page.</p>
       </section>
 
       <section id="m-privacy"><h3>Privacy</h3>
@@ -399,6 +403,7 @@
   // Simulated election night: counting starts at zero, arrives in uneven batches, holds on the final
   // result for a few updates, then quietly starts over.
   let demoP = 0, demoTick = 0, demoHold = 0, demoPaused = false, demoQuiet = false;
+  let demoLast = null; // the simulated feed for this tick, which the demo live feed reads
   const demoPrev = new Map();
   function demoize(b) {
     // Synthetic numbers on the real candidate lists - layout preview only.
@@ -461,7 +466,8 @@
     try {
       if (DEMO && demoPaused && model) return;
       if (!DEMO || !rawBundle) rawBundle = await fetchBundle();
-      model = buildModel(DEMO ? demoize(rawBundle) : rawBundle);
+      if (DEMO) demoLast = demoize(rawBundle);
+      model = buildModel(DEMO ? demoLast : rawBundle);
       lastOk = Date.now(); lastErr = null;
       assignColours();
       renderAll(demoQuiet);
@@ -469,6 +475,7 @@
       if (DEMO) $('#demoProg').textContent = `Simulated count: ${Math.round((model.mayor.pollsReceived / model.mayor.polls) * 100)}% of polls in`;
       maybeWelcome();
       renderWelcome();
+      loadFeed().catch((e) => console.warn('[feed]', e));
     } catch (e) {
       lastErr = e;
       console.warn('[results]', e);
@@ -613,16 +620,16 @@
     let key, note;
     if (mode === 'mayor') {
       key = [...colorOf.entries()].sort((a, b) => a[1] - b[1]).map(([n, s]) => sw(`var(--s${s})`, esc(n))).join('') + sw('var(--other)', 'Other / tied');
-      note = 'Darker = wider lead';
+      note = 'Stronger colour = wider lead';
     } else if (mode === 'council') {
       key = ramp('0', '40+ pts', "Council leader's lead over 2nd place");
       note = '<span class="lg-faces"><i class="lf pend"></i>Not called <i class="lf proj">&#10003;</i>Projected <i class="lf won">&#10003;</i>Winner</span>';
     } else if (mode === 'reporting') {
       key = ramp('0%', '100%', 'Polls reporting');
-      note = 'Darker = more counted';
+      note = 'Stronger colour = more counted';
     } else {
       key = ramp('0%', '60%+', 'Turnout (mayor ballots ÷ electors)');
-      note = 'Darker = higher turnout';
+      note = 'Stronger colour = higher turnout';
     }
     $('#legend').innerHTML = `<div class="lg-row">${key}</div>
       <div class="lg-row lg-note">${sw(css('--nodata'), 'No votes yet')}<span>${note}</span>
@@ -689,6 +696,17 @@
   // ---------- photos ----------
   // photos.json maps "<race key>|<name>" to a face crop from the candidate's own site.
   let photos = {};
+  // Incumbents (incumbents.json): who held each mayor/council seat going in. Not in the City's feed.
+  let incumbents = null;
+  const raceKeyOf = (r) => (r.key.startsWith('mayor|') ? 'mayor|city' : r.key);
+  function incTag(r, name, { short = false } = {}) {
+    const held = incumbents?.races?.[raceKeyOf(r)];
+    if (held?.running && held.running === name) return `<span class="inc" title="Incumbent: holds this seat going into the election">${short ? 'Inc.' : 'Incumbent'}</span>`;
+    const c = incumbents?.councillors?.[name];
+    if (c && c.runningIn === raceKeyOf(r)) return `<span class="inc cllr" title="Sitting councillor for Ward ${c.ward}, running here">Cllr${short ? '' : `, Ward ${c.ward}`}</span>`;
+    return '';
+  }
+  const openSeat = (r) => { const held = r && incumbents?.races?.[raceKeyOf(r)]; return held && !held.running ? held.incumbent : null; };
   const normName = (n) => n.replace(/\s+/g, ' ').trim();
   const photoOf = (pkey, name) => photos[`${pkey}|${normName(name)}`];
   const initials = (name) => { const p = normName(name).split(' '); return ((p[0]?.[0] || '') + (p.length > 1 ? p[p.length - 1][0] : '')).toUpperCase(); };
@@ -718,7 +736,7 @@
       const k = esc(`${r.key}|${c.name}`);
       return `<li class="cand${lead ? ' lead' : ''}" data-fk="${k}" title=""${esc(c.name)}: ${fmt(c.votes)} votes (${pct(c.pct, 2)})${c.delta ? `, +${fmt(c.delta)} since last update` : ''}">
         ${avatar(r.pkey, c.name, col)}
-        <span class="nm">${esc(c.name)}${tag}</span>
+        <span class="nm"><span class="nm-t">${esc(c.name)}</span>${incTag(r, c.name)}${tag}</span>
         <span class="delta">${c.delta ? `+${fmt(c.delta)}` : ''}</span>
         <span class="votes" data-ok="v|${k}">${fmt(c.votes)}</span>
         <span class="pct" data-ok="p|${k}">${pct(c.pct)}</span>
@@ -750,7 +768,7 @@
           <span>${fmt(rep.totalVoters)} electors</span>` : ''}</div>
       </div>
       <div class="races">
-        <div class="race"><div class="race-head"><h3>Council · Ward ${n}</h3><span class="meta">${raceMeta(w.council)}</span></div>
+        <div class="race"><div class="race-head"><h3>Council · Ward ${n}${openSeat(w.council) ? ` <span class="open-seat" title="${esc(openSeat(w.council))} is not running again here">Open seat</span>` : ''}</h3><span class="meta">${raceMeta(w.council)}</span></div>
           <div class="race-sum">${callRow(w.council)}</div>
           <div class="scroller"><ul class="cands">${candList(w.council)}</ul></div></div>
         <div class="race"><div class="race-head"><h3>Mayor · votes in Ward ${n}</h3><span class="meta">${raceMeta(w.mayor)}</span></div>
@@ -788,7 +806,7 @@
       const tag = lead && CALLED.has(st) ? `<span class="tick tick-${st}" title="${CALL_LABEL[st].replace(/&[^;]+;\s*/g, '')}">&#10003;</span>` : '';
       return `<div class="pc${lead ? ' first' : ''}" data-fk="${k}" title="${esc(c.name)}: ${fmt(c.votes)} votes (${pct(c.pct, 2)})">
         <span class="pc-rank">${counting ? i + 1 : ''}</span>${star(watchKey(r, c.name))}
-        ${avatar('mayor', c.name, col)}
+        <span class="pc-av">${avatar('mayor', c.name, col)}${incTag(r, c.name, { short: true })}</span>
         <div class="pc-name">${esc(c.name)}</div>${tag}
         ${counting ? `<div class="pc-nums"><b data-ok="pp|${k}">${pct(c.pct)}</b><span data-ok="pv|${k}">${fmt(c.votes)}</span></div>
         <div class="pc-delta"><span class="delta">${c.delta ? `+${fmt(c.delta)}` : ''}</span></div>
@@ -886,7 +904,7 @@
       const ring = colour ? (r.tied ? css('--other') : candColour(c.name) || css('--other')) : null;
       const badge = colour ? '' : `<span class="sb sb-${CALLED.has(st) ? st : 'pending'}">${st === 'projected' ? '&#10003;' : CALLED.has(st) ? '&#10003;' : ''}</span>`;
       const name = r.tied ? `Tied: ${esc(c.name)} &amp; ${esc(r.cands[1].name)}` : esc(c.name);
-      return `<span class="who"><span class="avw">${avatar(r.pkey, c.name, ring)}${badge}</span><span class="who-n">${name}</span></span>`;
+      return `<span class="who"><span class="avw">${avatar(r.pkey, c.name, ring)}${badge}</span><span class="who-n">${name}${r.tied ? '' : incTag(r, c.name, { short: true })}</span></span>`;
     };
     t.innerHTML = `<thead><tr>${COLS.map((c) => `<th data-k="${c.key}"${c.n ? ' class="n"' : ''}${sort.key === c.key ? ` aria-sort="${sort.dir > 0 ? 'ascending' : 'descending'}"` : ''}>${c.label}</th>`).join('')}</tr></thead>
       <tbody>${rows.map((w) => {
@@ -965,7 +983,7 @@
         ${star(wk)}${avatar(r.pkey, c.name, rk === 'mayor|city' ? candColour(c.name) : null)}
         <div class="wc-name">${esc(c.name)}${won ? `<span class="tick tick-${st}" title="${CALL_LABEL[st].replace(/&[^;]+;\s*/g, '')}">&#10003;</span>` : ''}</div>
         <div class="wc-pos">${counting ? `${tied ? 'T-' : ''}${ordinal(rank)} <span>of ${r.cands.length}</span>` : `<span>${r.cands.length} running</span>`}</div>
-        <div class="wc-race">${esc(w.label)}</div>
+        <div class="wc-race"><span class="nm-t">${esc(w.label)}</span>${incTag(r, c.name, { short: true })}</div>
         <div class="wc-votes">${counting ? `${fmt(c.votes)} · <b>${pct(c.pct)}</b>` : ''}</div>
         <div class="wc-gap${cls}">${gap}</div>
       </div>`;
@@ -992,6 +1010,78 @@
     const g = e.target.closest('[data-go]');
     if (g && (e.key === 'Enter' || e.key === ' ') && e.target === g) { e.preventDefault(); watchedRace(g.dataset.go)?.go(); }
   });
+
+  // ---------- live feed ----------
+  // Posts come from the Worker, which writes one feed for everyone. In ?demo they're made here from the
+  // simulated count, with the same rules and wording (worker/feed.js), so the layout can be previewed.
+  let posts = [];
+  let feedSeen = int(store.get('feedSeen'));
+  let feedAt = 0, feedLib = null, demoSnap = null, demoPosted = new Set(), demoId = 0;
+  const feedTime = (t) => new Date(t).toLocaleTimeString('en-CA', { timeZone: TZ, hour: 'numeric', minute: '2-digit' });
+  const KIND = {
+    'polls-closed': ['Polls closed', ''], 'first-results': ['First results', ''], milestone: ['Count', ''],
+    'ward-started': ['Counting begins', ''], 'wards-started': ['Counting begins', ''], 'ward-finished': ['Count complete', ''],
+    'lead-change': ['Lead change', 'k-lead'], 'close-race': ['Close race', 'k-close'], call: ['Race call', 'k-call'], 'trustee-calls': ['Trustee calls', 'k-call'],
+  };
+  async function loadFeed() {
+    if (params.get('src')) return;
+    if (DEMO) {
+      if (!rawBundle || !demoLast) return;
+      feedLib ||= await import('./worker/feed.js');
+      const cur = feedLib.snapshot(demoLast.all, demoLast.wardbyward, incumbents);
+      if (demoSnap && cur.rec < demoSnap.rec) { posts = []; demoSnap = null; demoPosted = new Set(); } // the simulation started over
+      for (const e of feedLib.diff(demoSnap, cur, 0, demoPosted)) posts.unshift({ id: ++demoId, t: Date.now(), kind: e.kind, ...feedLib.template(e) });
+      demoSnap = cur;
+    } else {
+      if (Date.now() - feedAt < 55000) return;
+      feedAt = Date.now();
+      const base = SOURCES.find((s) => s.id === 'worker')?.base;
+      const r = await fetch(`${base}/feed.json`, { cache: 'no-cache', signal: AbortSignal.timeout(10000) });
+      if (!r.ok) return;
+      posts = (await r.json()).posts || [];
+    }
+    renderFeed();
+  }
+  function renderFeed() {
+    const latest = posts[0];
+    $('#ticker').hidden = !latest;
+    if (latest) {
+      const tx = $('#tkText');
+      if (tx.dataset.id !== String(latest.id)) {
+        tx.dataset.id = latest.id; tx.textContent = latest.headline;
+        tx.classList.remove('in'); void tx.offsetWidth; tx.classList.add('in');
+        $('#tkTime').textContent = feedTime(latest.t);
+      }
+    }
+    if (tab === 'feed' && latest) { feedSeen = Math.max(feedSeen, latest.id); store.set('feedSeen', String(feedSeen)); }
+    const unread = posts.filter((p) => p.id > feedSeen).length;
+    $('#feedCount').hidden = !unread; $('#feedCount').textContent = unread > 99 ? '99+' : unread;
+    const list = $('#posts');
+    const shown = new Set([...list.querySelectorAll('.post')].map((x) => x.dataset.id));
+    list.innerHTML = posts.length ? posts.map((p) => {
+      const [label, cls] = KIND[p.kind] || ['Update', ''];
+      const won = (p.kind === 'call' || p.kind === 'trustee-calls') && !/projected/i.test(p.headline + p.body) ? ' k-won' : '';
+      return `<li class="post${shown.size && !shown.has(String(p.id)) ? ' fresh' : ''}" data-id="${p.id}">
+        <time>${feedTime(p.t)}</time><span class="kind ${cls}${won}">${label}</span><h4>${esc(p.headline)}</h4><p>${esc(p.body)}</p></li>`;
+    }).join('') : `<li class="empty">${Date.now() < POLLS_CLOSE ? 'Updates start when polls close at 8 p.m. They\'ll appear here as results come in.' : 'Waiting for the first results…'}</li>`;
+    renderToWatch();
+  }
+  // Races to watch: the tightest races still being counted, from the page's own numbers.
+  function renderToWatch() {
+    const el = $('#toWatch');
+    if (!model) { el.innerHTML = ''; return; }
+    const open = [model.mayor, ...Object.values(model.wards).map((w) => w.council)].filter((r) => r?.leader && r.cands[1] && !CALLED.has(r.call?.status) && r.pollsReceived / r.polls >= 0.1);
+    const close = open.sort((a, b) => a.margin - b.margin).slice(0, 4);
+    el.innerHTML = close.length ? `<div class="towatch"><h3>Races to watch</h3><div class="tw-list">${close.map((r) => {
+      const [a, b] = r.cands, n = r.key.split('|')[1];
+      return `<button type="button" class="tw" data-go="${r.key === 'mayor|city' ? 'mayor|city' : `council|${n}`}">
+        <div class="tw-where">${r.key === 'mayor|city' ? 'Mayor' : `Ward ${n} ${esc(model.wards[n]?.name || '')}`} · ${pct((r.pollsReceived / r.polls) * 100, 0)} in</div>
+        <div class="tw-who">${esc(lastName(a.name))} vs ${esc(lastName(b.name))}</div>
+        <div class="tw-gap">${fmt(a.votes - b.votes)} votes apart · ${(a.pct - b.pct).toFixed(1)} pts</div></button>`;
+    }).join('')}</div></div>` : '';
+  }
+  $('#toWatch').addEventListener('click', (e) => { const g = e.target.closest('[data-go]'); if (g && model) watchedRace(g.dataset.go)?.go(); });
+  $('#tickerBtn').addEventListener('click', () => { setTab('feed'); renderFeed(); $('#right').scrollIntoView({ behavior: 'smooth', block: 'start' }); });
 
   $('#raceSwitch').addEventListener('click', (e) => {
     const btn = e.target.closest('button'); if (!btn) return;
@@ -1031,6 +1121,7 @@
   // ---------- tabs ----------
   function setTab(t) {
     tab = t;
+    if (t === 'feed') renderFeed();
     for (const b of document.querySelectorAll('.tabs button')) b.setAttribute('aria-selected', String(b.dataset.tab === t && (t !== 'ward' || b.dataset.w === pinned)));
     for (const p of document.querySelectorAll('#right .panel')) p.hidden = p.id !== `panel-${t}`;
     saveHash();
@@ -1324,8 +1415,10 @@
   Promise.all([
     fetch('wards.json').then((r) => r.json()),
     fetch('photos.json').then((r) => r.json()).catch(() => ({})),
-  ]).then(([g, ph]) => {
+    fetch('incumbents.json').then((r) => r.json()).catch(() => null),
+  ]).then(([g, ph, inc]) => {
     geo = g;
+    incumbents = inc;
     photos = Object.fromEntries(Object.entries(ph).map(([k, v]) => { const [a, b] = k.split('|'); return [`${a}|${normName(b)}`, v]; }));
     buildMap();
     if (!geo.wards[pinned]) pinned = '1';
@@ -1333,7 +1426,7 @@
     openWardTab(pinned);
     setTab(tab);
     renderMethod();
-    renderMap(); renderWard(); renderMe();
+    renderMap(); renderWard(); renderMe(); renderFeed();
     tick();
     setTimeout(maybeAskWard, 30000);
     setInterval(tick, POLL_MS);

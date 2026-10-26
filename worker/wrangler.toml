@@ -10,3 +10,18 @@ class_name = "Viewers"
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["Viewers"]
+
+[[durable_objects.bindings]]
+name = "NEWSROOM"
+class_name = "Newsroom"
+
+[[migrations]]
+tag = "v2"
+new_sqlite_classes = ["Newsroom"]
+
+[ai]
+binding = "AI"
+
+# The live feed runs every minute over election night (UTC dates, so this covers the evening of Oct 26 in Toronto).
+[triggers]
+crons = ["* * 26-29 10 *"]

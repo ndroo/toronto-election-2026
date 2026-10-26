@@ -1,0 +1,128 @@
+{
+ "asOf": "2026-10-26",
+ "note": "Office holders going into the 2026 election, from the City's Members of Council page and news coverage. Mayor and council only.",
+ "sources": [
+  "https://www.toronto.ca/city-government/council/members-of-council/",
+  "https://www.cp24.com/local/toronto/2026/04/30/gord-perks-wont-run-in-upcoming-election-after-more-than-20-years-at-toronto-city-hall/",
+  "https://www.cp24.com/politics/toronto-city-hall/2026/08/21/shakeup-in-race-for-toronto-city-council-as-incumbent-switches-wards-moments-prior-to-deadline/",
+  "https://globalnews.ca/news/12030633/dianne-saxe-toronto-danforth/",
+  "https://www.cp24.com/politics/toronto-city-hall/2025/05/08/toronto-councillor-jennifer-mckelvie-submits-resignation-following-federal-win-for-liberals-in-ajax",
+  "https://www.toronto.ca/wp-content/uploads/2026/08/8767-2026-Declaration-dAcclamation.pdf"
+ ],
+ "races": {
+  "mayor|city": {
+   "incumbent": "Olivia Chow",
+   "running": "Olivia Chow"
+  },
+  "council|1": {
+   "incumbent": "Vincent Crisanti",
+   "running": "Vincent Crisanti"
+  },
+  "council|2": {
+   "incumbent": "Stephen Holyday",
+   "running": "Stephen Holyday"
+  },
+  "council|3": {
+   "incumbent": "Amber Morley",
+   "running": "Amber Morley"
+  },
+  "council|4": {
+   "incumbent": "Gord Perks",
+   "running": null
+  },
+  "council|5": {
+   "incumbent": "Frances Nunziata",
+   "running": "Frances Nunziata"
+  },
+  "council|6": {
+   "incumbent": "James Pasternak",
+   "running": "James Pasternak"
+  },
+  "council|7": {
+   "incumbent": "Anthony Perruzza",
+   "running": "Anthony Perruzza"
+  },
+  "council|8": {
+   "incumbent": "Mike Colle",
+   "running": "Mike Colle"
+  },
+  "council|9": {
+   "incumbent": "Alejandra Bravo",
+   "running": "Alejandra Bravo"
+  },
+  "council|10": {
+   "incumbent": "Ausma Malik",
+   "running": "Ausma Malik"
+  },
+  "council|11": {
+   "incumbent": "Dianne Saxe",
+   "running": null
+  },
+  "council|12": {
+   "incumbent": "Josh Matlow",
+   "running": "Josh Matlow"
+  },
+  "council|13": {
+   "incumbent": "Chris Moise",
+   "running": "Chris Moise"
+  },
+  "council|14": {
+   "incumbent": "Paula Fletcher",
+   "running": null
+  },
+  "council|15": {
+   "incumbent": "Rachel Chernos Lin",
+   "running": "Rachel Chernos Lin"
+  },
+  "council|16": {
+   "incumbent": "Jon Burnside",
+   "running": "Jon Burnside"
+  },
+  "council|17": {
+   "incumbent": "Shelley Carroll",
+   "running": "Shelley Carroll"
+  },
+  "council|18": {
+   "incumbent": "Lily Cheng",
+   "running": "Lily Cheng"
+  },
+  "council|19": {
+   "incumbent": "Brad Bradford",
+   "running": null
+  },
+  "council|20": {
+   "incumbent": "Parthi Kandavel",
+   "running": "Parthi Kandavel"
+  },
+  "council|21": {
+   "incumbent": "Michael Thompson",
+   "running": "Michael Thompson"
+  },
+  "council|22": {
+   "incumbent": "Nick Mantas",
+   "running": "Nick Mantas"
+  },
+  "council|23": {
+   "incumbent": "Jamaal Myers",
+   "running": "Jamaal Myers"
+  },
+  "council|24": {
+   "incumbent": "Paul Ainslie",
+   "running": "Paul Ainslie"
+  },
+  "council|25": {
+   "incumbent": "Neethan Shan",
+   "running": "Neethan Shan"
+  }
+ },
+ "councillors": {
+  "Brad Bradford": {
+   "ward": 19,
+   "runningIn": "mayor|city"
+  },
+  "Dianne Saxe": {
+   "ward": 11,
+   "runningIn": "council|14"
+  }
+ }
+}
