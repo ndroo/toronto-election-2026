@@ -140,8 +140,10 @@ export class Viewers extends DurableObject {
 // One writer for everyone: a cron trigger runs Newsroom.tick() every minute. It reads the City feed, compares it
 // with the last copy, and stores any new posts. Workers AI words the posts; every AI post is checked against the
 // facts, and the template text is used whenever the AI is unavailable, over budget, slow or fails the check.
+// OpenAI writes the posts (OPENAI_API_KEY secret); Workers AI is the backup if OpenAI can't be reached.
+const OPENAI_MODEL = 'gpt-5.5';
 const AI_MODEL = '@cf/meta/llama-3.3-70b-instruct-fp8-fast';
-const AI_DAILY_CALLS = 200; // well inside the free daily allowance; templates take over beyond it
+const AI_DAILY_CALLS = 400; // a few dollars at most for the night; templates take over beyond it
 const AI_MAX_EVENTS = 8;
 
 const AI_SYSTEM = `You write the live-updates feed for a nonpartisan, ad-free Toronto municipal election results page on election night, in the voice of a calm, experienced newsroom live blog.
@@ -163,10 +165,33 @@ Rules:
 Reply with JSON only: {"posts":[{"id":"<event id>","headline":"...","body":"..."}]} with one post per event, same ids.`;
 
 const AI_SCHEMA = {
-  type: 'object',
-  properties: { posts: { type: 'array', items: { type: 'object', properties: { id: { type: 'string' }, headline: { type: 'string' }, body: { type: 'string' } }, required: ['id', 'headline', 'body'] } } },
+  type: 'object', additionalProperties: false,
+  properties: { posts: { type: 'array', items: { type: 'object', additionalProperties: false, properties: { id: { type: 'string' }, headline: { type: 'string' }, body: { type: 'string' } }, required: ['id', 'headline', 'body'] } } },
   required: ['posts'],
 };
+
+// One structured-output call: OpenAI if there's a key, otherwise (or if it fails) Workers AI.
+async function aiWrite(env, messages) {
+  if (env.OPENAI_API_KEY) {
+    try {
+      const r = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST', signal: AbortSignal.timeout(20000),
+        headers: { Authorization: `Bearer ${env.OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model: OPENAI_MODEL, reasoning_effort: 'low', messages, response_format: { type: 'json_schema', json_schema: { name: 'feed_posts', strict: true, schema: AI_SCHEMA } } }),
+      });
+      if (!r.ok) throw new Error(`OpenAI ${r.status} ${(await r.text()).slice(0, 200)}`);
+      return JSON.parse((await r.json()).choices[0].message.content);
+    } catch (err) {
+      console.log('feed: OpenAI failed, trying Workers AI', String(err.message || err));
+    }
+  }
+  if (!env.AI) throw new Error('no AI available');
+  const res = await Promise.race([
+    env.AI.run(AI_MODEL, { messages, max_tokens: 1200, temperature: 0.5, response_format: { type: 'json_schema', json_schema: AI_SCHEMA } }),
+    new Promise((_, no) => setTimeout(() => no(new Error('timeout')), 20000)),
+  ]);
+  return typeof res?.response === 'string' ? JSON.parse(res.response) : res?.response;
+}
 
 export class Newsroom extends DurableObject {
   constructor(ctx, env) {
@@ -213,27 +238,19 @@ export class Newsroom extends DurableObject {
     const day = new Date().toISOString().slice(0, 10);
     const budget = this.get('ai') || { day, calls: 0 };
     if (budget.day !== day) { budget.day = day; budget.calls = 0; }
-    if (!this.env.AI || budget.calls >= AI_DAILY_CALLS) return out;
-    budget.calls++;
-    this.put('ai', budget);
+    if ((!this.env.OPENAI_API_KEY && !this.env.AI) || budget.calls >= AI_DAILY_CALLS) return out;
     const batch = events.filter((e) => !e.noAI).slice(0, AI_MAX_EVENTS);
     if (!batch.length) return out;
+    budget.calls++;
+    this.put('ai', budget);
     const recent = this.sql.exec('SELECT headline FROM posts ORDER BY id DESC LIMIT 6').toArray().map((r) => r.headline);
     const names = new Set();
     for (const r of Object.values(cur.races)) for (const c of [r.a, r.b]) if (c?.name) names.add(c.name);
     try {
-      const res = await Promise.race([
-        this.env.AI.run(AI_MODEL, {
-          messages: [
-            { role: 'system', content: AI_SYSTEM },
-            { role: 'user', content: JSON.stringify({ recentHeadlines: recent, events: batch.map((e) => ({ id: e.id, kind: e.kind, facts: e.facts, draft: out.get(e.id) })) }) },
-          ],
-          max_tokens: 1200, temperature: 0.5,
-          response_format: { type: 'json_schema', json_schema: AI_SCHEMA },
-        }),
-        new Promise((_, no) => setTimeout(() => no(new Error('timeout')), 20000)),
+      const body = await aiWrite(this.env, [
+        { role: 'system', content: AI_SYSTEM },
+        { role: 'user', content: JSON.stringify({ recentHeadlines: recent, events: batch.map((e) => ({ id: e.id, kind: e.kind, facts: e.facts, draft: out.get(e.id) })) }) },
       ]);
-      const body = typeof res?.response === 'string' ? JSON.parse(res.response) : res?.response;
       for (const p of body?.posts || []) {
         const e = batch.find((x) => x.id === p.id);
         if (!e || typeof p.headline !== 'string' || typeof p.body !== 'string') continue;
