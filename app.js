@@ -1041,7 +1041,7 @@
       if (!r.ok) return;
       posts = (await r.json()).posts || [];
     }
-    renderFeed();
+    holdScroll(renderFeed);
   }
   function renderFeed() {
     const latest = posts[0];
@@ -1247,10 +1247,48 @@
     }
   }
 
+  // Keep what's on screen still while things above it change height (the ticker appearing, a lead sentence
+  // wrapping, new posts). Chrome and Firefox do this natively (CSS scroll anchoring); Safari doesn't, so there
+  // the page notes a stable element near the reading line before re-rendering and scrolls it back into place.
+  const NATIVE_ANCHOR = !!window.CSS?.supports?.('overflow-anchor', 'auto');
+  // An anchor is found again after re-rendering by a selector plus its index among matches.
+  const anchorKey = (el) => {
+    for (let e = el; e && e !== document.body; e = e.parentElement) {
+      if (e.matches('.post[data-id]')) return [`.post[data-id="${e.dataset.id}"]`, 0];
+      if (e.matches('.race, .board-ward')) {
+        const host = e.parentElement.closest('[id]');
+        const sel = `#${CSS.escape(host.id)} .${e.classList[0]}`;
+        return [sel, [...document.querySelectorAll(sel)].indexOf(e)];
+      }
+      if (e.id && !e.closest('[data-fk]')) return [`#${CSS.escape(e.id)}`, 0];
+    }
+    return null;
+  };
+  const findAnchor = (k) => document.querySelectorAll(k[0])[k[1]];
+  const scrollerOf = (el) => {
+    for (let e = el.parentElement; e && e !== document.body; e = e.parentElement) {
+      const o = getComputedStyle(e).overflowY;
+      if ((o === 'auto' || o === 'scroll') && e.scrollHeight > e.clientHeight) return e;
+    }
+    return document.scrollingElement;
+  };
+  function holdScroll(render) {
+    if (NATIVE_ANCHOR) return render();
+    const at = document.elementFromPoint(innerWidth / 2, innerHeight / 3);
+    const key = at && anchorKey(at);
+    const before = key && findAnchor(key)?.getBoundingClientRect().top;
+    render();
+    if (before == null) return;
+    const el = findAnchor(key);
+    if (!el) return;
+    const delta = el.getBoundingClientRect().top - before;
+    if (Math.abs(delta) >= 1) scrollerOf(el).scrollTop += delta;
+  }
+
   function renderAll(quiet = false) {
     const snap = snapshot();
     flashNow = true;
-    renderStatus(); renderStats(); renderMap(); renderCity(); renderWard(); renderTable(); renderBoards(); renderWatch(); renderTip();
+    holdScroll(() => { renderStatus(); renderStats(); renderMap(); renderCity(); renderWard(); renderTable(); renderBoards(); renderWatch(); renderFeed(); renderTip(); });
     flashNow = false;
     animateChanges(snap, quiet);
   }
@@ -1453,7 +1491,7 @@
     tick();
     setTimeout(maybeAskWard, 30000);
     setInterval(tick, POLL_MS);
-    setInterval(renderStatus, 1000);
+    setInterval(() => holdScroll(renderStatus), 1000);
     setTimeout(maybeWelcome, 4000); // still greet people if the first load is slow or fails
     document.addEventListener('visibilitychange', () => { if (!document.hidden) tick(); });
   });
