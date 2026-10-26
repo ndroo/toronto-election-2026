@@ -15,7 +15,7 @@
     if (m) return [m[1], location.pathname.split('/').filter(Boolean)[0] || `${m[1]}.github.io`];
     return ['ndroo', 'toronto-election-2026'];
   })();
-  const POLL_MS = DEMO ? 6000 : 30000;
+  const POLL_MS = DEMO ? 9000 : 30000;
   const SOURCES = params.get('src')
     ? [{ id: 'custom', url: params.get('src') }]
     : [
@@ -41,6 +41,8 @@
   const time = (d) => Date.now() - d > 12 * 3600e3
     ? d.toLocaleString('en-CA', { timeZone: TZ, month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
     : d.toLocaleTimeString('en-CA', { timeZone: TZ, hour: 'numeric', minute: '2-digit', second: '2-digit' });
+  const hm = (d) => d ? d.toLocaleTimeString('en-CA', { timeZone: TZ, hour: 'numeric', minute: '2-digit' }) : '';
+  const compact = (n) => n >= 1e6 ? `${(n / 1e6).toFixed(2)}M` : n >= 1e4 ? `${Math.round(n / 1e3)}K` : fmt(n);
   const ago = (ms) => { const s = Math.max(0, Math.round(ms / 1000)); if (s >= 86400) return `${Math.floor(s / 86400)} days ago`; return s < 60 ? `${s}s ago` : s < 3600 ? `${Math.floor(s / 60)}m ${s % 60}s ago` : `${Math.floor(s / 3600)}h ${Math.floor((s % 3600) / 60)}m ago`; };
   const css = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
   const hexRgb = (h) => { h = h.replace('#', ''); return [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16)); };
@@ -81,6 +83,7 @@
     }
     list.sort((a, b) => b.votes - a.votes || a.name.localeCompare(b.name));
     const r = {
+      key,
       polls: int(w.polls), pollsReceived: int(w.pollsReceived), totalVoters: int(w.totalVoters),
       votes: int(w.votesReceived ?? w.votesCounted) || sum, cands: list,
     };
@@ -356,7 +359,8 @@
     throw lastErr || new Error('No data source available');
   }
 
-  let demoP = 0.08;
+  let demoP = 0.08, demoTick = 0;
+  const demoPrev = new Map();
   function demoize(b) {
     // Synthetic numbers on the real candidate lists - layout preview only.
     const rnd = (s) => { let h = 2166136261; for (const ch of s) h = Math.imul(h ^ ch.charCodeAt(0), 16777619); return ((h >>> 0) % 10000) / 10000; };
@@ -373,12 +377,19 @@
     const fill = (w, cands, key, p) => {
       w.pollsReceived = String(Math.min(int(w.polls), Math.round(int(w.polls) * clamp(p + (rnd(key.replace(/^\w+\|/, '')) - 0.5) * 0.3))));
       const cast = Math.round(int(w.totalVoters) * 0.33 * (int(w.pollsReceived) / Math.max(1, int(w.polls))));
-      const ws = cands.map((c) => weight(c.name, key)), tot = ws.reduce((a, x) => a + x, 0);
-      cands.forEach((c, i) => { c.votesReceived = String(Math.round((cast * ws[i]) / tot)); c.percentage = undefined; });
+      // Swings that fade as counting finishes, so close candidates trade places now and then.
+      const ws = cands.map((c) => weight(c.name, key) * (1 + 0.35 * (1 - p) * Math.sin(demoTick * 1.1 + rnd(c.name + key) * 6.28))), tot = ws.reduce((a, x) => a + x, 0);
+      cands.forEach((c, i) => {
+        const k = `${key}|${c.name}`;
+        const v = Math.max(demoPrev.get(k) || 0, Math.round((cast * ws[i]) / tot));
+        demoPrev.set(k, v);
+        c.votesReceived = String(v); c.percentage = undefined;
+      });
       w.votesReceived = String(cands.reduce((a, c) => a + int(c.votesReceived), 0));
       cands.sort((a, b) => int(b.votesReceived) - int(a.votesReceived));
     };
-    const p = (demoP = Math.min(1, demoP + 0.07));
+    demoTick++;
+    const p = (demoP = Math.min(1, demoP + 0.04));
     const d = structuredClone(b);
     for (const o of d.all.office) for (const w of o.ward) fill(w, w.candidate, `${o.id}|${w.num}`, p);
     // Rebuild the mayor-by-ward file from the per-ward fill so the two agree.
@@ -636,13 +647,14 @@
       const col = colour ? candColour(c.name) : null;
       const st = r.call?.status;
       const tag = lead && showCall && CALLED.has(st) ? `<span class="tag tag-${st}">${{ projected: 'Projected', decided: 'Winner', official: 'Official', acclaimed: 'Acclaimed' }[st]}</span>` : '';
-      return `<li class="cand${lead ? ' lead' : ''}${c.delta && flashNow ? ' flash' : ''}" title="${esc(c.name)}: ${fmt(c.votes)} votes (${pct(c.pct, 2)})${c.delta ? `, +${fmt(c.delta)} since last update` : ''}">
+      const k = esc(`${r.key}|${c.name}`);
+      return `<li class="cand${lead ? ' lead' : ''}" data-fk="${k}" title=""${esc(c.name)}: ${fmt(c.votes)} votes (${pct(c.pct, 2)})${c.delta ? `, +${fmt(c.delta)} since last update` : ''}">
         ${avatar(r.pkey, c.name, col)}
         <span class="nm">${esc(c.name)}${tag}</span>
         <span class="delta">${c.delta ? `+${fmt(c.delta)}` : ''}</span>
-        <span class="votes">${fmt(c.votes)}</span>
-        <span class="pct">${pct(c.pct)}</span>
-        <span class="bar"><i style="width:${(c.pct / max) * 100}%;${col ? `background:${col}` : ''}"></i></span>
+        <span class="votes" data-ok="v|${k}">${fmt(c.votes)}</span>
+        <span class="pct" data-ok="p|${k}">${pct(c.pct)}</span>
+        <span class="bar"><i data-bk="${k}" style="width:${(c.pct / max) * 100}%;${col ? `background:${col}` : ''}"></i></span>
       </li>`;
     }).join('');
   }
@@ -706,9 +718,9 @@
       ['Council called', `${called}/${wards.length}`, meter(wards.length ? called / wards.length : 0, called === wards.length)],
       [`Polls reporting · ${pct(r.polls ? (r.pollsReceived / r.polls) * 100 : 0, 0)}`, `${fmt(r.pollsReceived)}/${fmt(r.polls)}`, meter(r.polls ? r.pollsReceived / r.polls : 0, r.complete)],
       ['Wards complete', `${wardsDone}/${wards.length}`, meter(wards.length ? wardsDone / wards.length : 0, wards.length > 0 && wardsDone === wards.length)],
-      [`Turnout · ${fmt(r.votes)} of ${fmt(r.totalVoters)}`, pct(r.totalVoters ? (r.votes / r.totalVoters) * 100 : 0), meter(r.totalVoters ? r.votes / r.totalVoters : 0)],
+      [`Turnout · ${compact(r.votes)} of ${compact(r.totalVoters)}`, pct(r.totalVoters ? (r.votes / r.totalVoters) * 100 : 0), meter(r.totalVoters ? r.votes / r.totalVoters : 0)],
     ];
-    $('#stats').innerHTML = s.map(([k, v, m]) => `<div class="stat"><b>${v}</b>${m}<span>${k}</span></div>`).join('');
+    $('#stats').innerHTML = s.map(([k, v, m], i) => `<div class="stat"><b${i ? ` data-ok="s|${i}"` : ''}>${v}</b>${m}<span>${k}</span></div>`).join('');
   }
 
   function renderStatus() {
@@ -725,8 +737,8 @@
       const relayAge = model.relayedAt ? Date.now() - model.relayedAt : 0;
       if (lastErr) { st.classList.add('error'); tx.textContent = `Connection problem - showing data from ${gen}`; }
       else if (!DEMO && relayAge > STALE_MS) { st.classList.add('stale'); tx.textContent = `Relay delayed - last checked ${ago(relayAge)}`; }
-      else if (r.complete) { st.classList.add('live'); tx.textContent = `All polls in · ${gen}`; }
-      else if (r.pollsReceived > 0) { st.classList.add('live'); tx.textContent = `Live · ${gen}`; }
+      else if (r.complete) { st.classList.add('live'); tx.textContent = `All polls in · ${hm(model.generatedAt)}`; }
+      else if (r.pollsReceived > 0) { st.classList.add('live'); tx.textContent = `Live · updated ${hm(model.generatedAt)}`; }
       else {
         const ms = POLLS_CLOSE - Date.now();
         st.classList.add('waiting');
@@ -765,10 +777,10 @@
       <tbody>${rows.map((w) => {
         const r = w.mayor || w.council;
         const rp = r?.polls ? r.pollsReceived / r.polls : 0;
-        return `<tr data-w="${w.num}" class="${String(w.num) === pinned ? 'pinned' : ''}${String(w.num) === hover ? ' hot' : ''}">
+        return `<tr data-w="${w.num}" data-fk="t|${w.num}" class=""${String(w.num) === pinned ? 'pinned' : ''}${String(w.num) === hover ? ' hot' : ''}">
           <td><b class="num">${w.num}</b> ${esc(w.name)}</td>
-          <td><span class="num">${r ? `${r.pollsReceived}/${r.polls}` : ''}</span>${meter(rp, r?.complete)}</td>
-          <td><span class="num">${pct(COLS[2].v(w) * 100)}</span>${meter(COLS[2].v(w))}</td>
+          <td><span class="num" data-ok="tr|${w.num}">${r ? `${r.pollsReceived}/${r.polls}` : ''}</span>${meter(rp, r?.complete)}</td>
+          <td><span class="num" data-ok="tt|${w.num}">${pct(COLS[2].v(w) * 100)}</span>${meter(COLS[2].v(w))}</td>
           <td>${who(w.mayor, true)}${w.mayor?.leader ? `<div class="sub2">${pct(w.mayor.leader.pct)} · lead ${w.mayor.margin.toFixed(1)} pts</div>` : ''}</td>
           <td>${who(w.council)}${w.council?.leader ? `<div class="sub2">${pct(w.council.leader.pct)} · lead ${w.council.margin.toFixed(1)} pts · ${w.council.cands.length} running</div>` : ''}</td>
           </tr>`;
@@ -804,10 +816,77 @@
   }
   $('.tabs').addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) setTab(b.dataset.tab); });
 
+  // ---------- motion ----------
+  // Only on data updates: changed digits roll like an odometer, rows slide to their new places,
+  // and bars grow from their previous length. Hover re-renders never animate.
+  const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)');
+  const odoPrev = new Map();
+  const EASE = 'cubic-bezier(.45,0,.25,1.04)'; // slow start, gentle settle: easy to follow by eye
+  const MOVE_MS = 1600;
+  function snapshot() {
+    const pos = new Map(), bars = new Map();
+    for (const el of document.querySelectorAll('[data-fk]')) if (el.offsetParent) pos.set(el.dataset.fk, el.getBoundingClientRect().top);
+    for (const el of document.querySelectorAll('[data-bk]')) bars.set(el.dataset.bk, el.style.width);
+    return { pos, bars };
+  }
+  function rollHTML(a, b, base = 0) {
+    const n = Math.max(a.length, b.length);
+    a = a.padStart(n, '\u2007'); b = b.padStart(n, '\u2007');
+    const up = parseFloat(b.replace(/[^\d.-]/g, '')) >= parseFloat(a.replace(/[^\d.-]/g, ''));
+    let out = '';
+    for (let i = 0; i < n; i++) {
+      if (a[i] === b[i]) { out += esc(b[i]); continue; }
+      const d = base + (n - 1 - i) * 120; // right-most digit turns first, like a counter
+      out += up ? `<span class="roll" style="--d:${d}ms"><span>${esc(a[i])}</span><span>${esc(b[i])}</span></span>`
+        : `<span class="roll down" style="--d:${d}ms"><span>${esc(b[i])}</span><span>${esc(a[i])}</span></span>`;
+    }
+    return out;
+  }
+  // A stream rather than a rush: changes flow through the page in reading order. Each row's digits roll
+  // in turn (bars grow with them), and a row that changed place slides only after its own numbers settle.
+  const ROLL_PHASE_MS = 1300; // time for a row's digits to finish turning
+  const STREAM_STEP_MS = 70, STREAM_MAX_MS = 3000;
+  function animateChanges(snap) {
+    const motion = !reduceMotion.matches;
+    const rowStart = new Map(); // row key -> when its numbers start rolling
+    let step = 0;
+    const startFor = (el) => {
+      const row = el.closest('[data-fk]')?.dataset.fk;
+      if (row && rowStart.has(row)) return rowStart.get(row);
+      const t = Math.min(step++ * STREAM_STEP_MS, STREAM_MAX_MS);
+      if (row) rowStart.set(row, t);
+      return t;
+    };
+    for (const el of document.querySelectorAll('[data-ok]')) {
+      const k = el.dataset.ok, now = el.textContent, before = odoPrev.get(k);
+      odoPrev.set(k, now);
+      if (motion && before != null && before !== now && el.offsetParent) el.innerHTML = rollHTML(before, now, startFor(el));
+    }
+    if (!motion) return;
+    for (const el of document.querySelectorAll('[data-bk]')) {
+      const before = snap.bars.get(el.dataset.bk);
+      if (before && before !== el.style.width) {
+        el.animate([{ width: before }, { width: el.style.width }], { duration: 1100, delay: startFor(el), easing: EASE, fill: 'backwards' });
+      }
+    }
+    for (const el of document.querySelectorAll('[data-fk]')) {
+      const before = snap.pos.get(el.dataset.fk);
+      if (before == null || !el.offsetParent) continue;
+      const dy = before - el.getBoundingClientRect().top;
+      if (Math.abs(dy) < 2) continue;
+      // Rows climbing the list pass over the ones they overtake; each waits in its old spot until its turn.
+      el.style.position = 'relative'; el.style.zIndex = dy > 0 ? '2' : '1'; el.style.background = 'var(--surface)';
+      el.animate([{ transform: `translateY(${dy}px)`, boxShadow: '0 6px 18px rgba(0,0,0,.14)' }, { transform: 'translateY(0)', boxShadow: '0 0 0 rgba(0,0,0,0)' }],
+        { duration: MOVE_MS, delay: (rowStart.get(el.dataset.fk) ?? startFor(el)) + ROLL_PHASE_MS, easing: EASE, fill: 'backwards' }).onfinish = () => { el.style.zIndex = ''; el.style.background = ''; };
+    }
+  }
+
   function renderAll() {
+    const snap = snapshot();
     flashNow = true;
     renderStatus(); renderStats(); renderMap(); renderCity(); renderWard(); renderTable(); renderBoards(); renderTip();
     flashNow = false;
+    animateChanges(snap);
   }
 
   // ---------- welcome dialog ----------
