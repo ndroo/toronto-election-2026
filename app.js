@@ -53,6 +53,8 @@
   let pinned = hash.get('w') || '1';
   let hover = null;
   let sort = { key: 'num', dir: 1 };
+  let tab = ['ward', 'wards', 'school', 'about'].includes(hash.get('t')) ? hash.get('t') : 'ward';
+  let board = null; // selected school board office id
   let flashNow = false; // only animate vote changes on data updates, not on hover re-renders
 
   // ---------- model ----------
@@ -265,10 +267,10 @@
       if (n) { setHover(n); placeTip(e.clientX, e.clientY); } else setHover(null);
     });
     svg.addEventListener('pointerleave', () => setHover(null));
-    svg.addEventListener('click', (e) => { const n = e.target.dataset?.w; if (n) setPinned(n); });
+    svg.addEventListener('click', (e) => { const n = e.target.dataset?.w; if (n) { setPinned(n); setTab('ward'); } });
     svg.addEventListener('focusin', (e) => { const n = e.target.dataset?.w; if (n) { setHover(n); const r = e.target.getBoundingClientRect(); placeTip(r.right, r.top); } });
     svg.addEventListener('focusout', () => setHover(null));
-    svg.addEventListener('keydown', (e) => { const n = e.target.dataset?.w; if (n && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); setPinned(n); } });
+    svg.addEventListener('keydown', (e) => { const n = e.target.dataset?.w; if (n && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); setPinned(n); setTab('ward'); } });
     $('.modes').addEventListener('click', (e) => { const m = e.target.dataset?.mode; if (m) { mode = m; saveHash(); renderMap(); } });
   }
 
@@ -316,7 +318,7 @@
     if (mode === 'mayor') {
       const items = [...colorOf.entries()].sort((a, b) => a[1] - b[1])
         .map(([n, s]) => `<span><i class="sw" style="background:var(--s${s})"></i>${esc(n)}</span>`);
-      L.innerHTML = items.join('') + `<span><i class="sw" style="background:var(--other)"></i>Other / tied</span>${nd}<span>Darker = wider lead</span>`;
+      L.innerHTML = items.join('') + `<span><i class="sw" style="background:var(--other)"></i>Other / tied</span>${nd}<span>Darker = wider lead</span><span style="color:var(--muted)">Hover to preview · click to pin</span>`;
     } else if (mode === 'council') {
       L.innerHTML = `<span>Lead over 2nd place: ${ramp('0', '40+ pts')}</span>${nd}`;
     } else if (mode === 'reporting') {
@@ -344,7 +346,7 @@
     for (const tr of document.querySelectorAll('#wardTable tbody tr')) tr.classList.toggle('pinned', tr.dataset.w === pinned);
     renderWard();
   }
-  function saveHash() { history.replaceState(null, '', `#w=${pinned}&m=${mode}`); }
+  function saveHash() { history.replaceState(null, '', `#w=${pinned}&m=${mode}&t=${tab}`); }
 
   const tip = $('#tip');
   function placeTip(x, y) {
@@ -380,33 +382,43 @@
       const lead = r.leader && i === 0 && !r.tied;
       const col = colour ? candColour(c.name) : null;
       const tag = lead && showComplete && r.complete ? '<span class="tag">Unofficial winner</span>' : '';
-      return `<li class="cand${lead ? ' lead' : ''}${c.delta && flashNow ? ' flash' : ''}" title="${esc(c.name)}: ${fmt(c.votes)} votes (${pct(c.pct, 2)})">
+      return `<li class="cand${lead ? ' lead' : ''}${c.delta && flashNow ? ' flash' : ''}" title="${esc(c.name)}: ${fmt(c.votes)} votes (${pct(c.pct, 2)})${c.delta ? `, +${fmt(c.delta)} since last update` : ''}">
         <span class="sw" style="background:${col || 'transparent'}"></span>
         <span class="nm">${esc(c.name)}${tag}</span>
-        <span class="votes">${fmt(c.votes)}${c.delta ? `<span class="delta">+${fmt(c.delta)}</span>` : ''}</span>
+        <span class="delta">${c.delta ? `+${fmt(c.delta)}` : ''}</span>
+        <span class="votes">${fmt(c.votes)}</span>
         <span class="pct">${pct(c.pct)}</span>
         <span class="bar"><i style="width:${(c.pct / max) * 100}%;${col ? `background:${col}` : ''}"></i></span>
       </li>`;
     }).join('');
   }
-  const raceMeta = (r) => r ? `${fmt(r.pollsReceived)}/${fmt(r.polls)} polls - ${fmt(r.votes)} votes${r.complete ? ' - all polls in' : ''}` : '';
+  const raceMeta = (r) => r ? `${fmt(r.pollsReceived)}/${fmt(r.polls)} polls · ${fmt(r.votes)} votes${r.complete ? ' · all in' : ''}` : '';
 
   function renderWard() {
     const n = hover || pinned;
-    const el = $('#wardPanel');
+    $('#tabWard').textContent = pinned;
+    const el = $('#panel-ward');
     if (!model || !n) { el.innerHTML = '<div class="empty">Hover or tap a ward on the map.</div>'; return; }
     const w = model.wards[n] || { name: geo.wards[n]?.name };
     const rep = w.mayor || w.council;
+    // Keep each list's scroll position when the panel re-renders for the same ward.
+    const keep = el.dataset.w === String(n) ? [...el.querySelectorAll('.scroller')].map((x) => x.scrollTop) : [];
+    el.dataset.w = n;
     el.innerHTML = `
-      <div class="ward-title"><span class="wn">Ward ${n}</span><span class="wname">${esc(w.name || '')}</span>
-        <span class="pinned">${hover && hover !== pinned ? 'preview - click to pin' : 'pinned'}</span></div>
-      <div class="ward-sub">${rep ? `<span>${fmt(rep.pollsReceived)} of ${fmt(rep.polls)} polls reporting (${pct(rep.polls ? (rep.pollsReceived / rep.polls) * 100 : 0, 0)})</span>
-        <span>${fmt(rep.totalVoters)} electors</span>
-        <span>Turnout ${pct(rep.totalVoters ? (rep.votes / rep.totalVoters) * 100 : 0)}</span>` : ''}</div>
+      <div class="ward-head">
+        <div class="ward-title"><span class="wn">Ward ${n}</span><span class="wname">${esc(w.name || '')}</span>
+          <span class="pinned">${hover && hover !== pinned ? 'preview · click to pin' : 'pinned'}</span></div>
+        <div class="ward-sub">${rep ? `<span>${fmt(rep.pollsReceived)} of ${fmt(rep.polls)} polls reporting (${pct(rep.polls ? (rep.pollsReceived / rep.polls) * 100 : 0, 0)})</span>
+          <span>${fmt(rep.totalVoters)} electors</span>
+          <span>Turnout ${pct(rep.totalVoters ? (rep.votes / rep.totalVoters) * 100 : 0)}</span>` : ''}</div>
+      </div>
       <div class="races">
-        <div class="race"><h3>Councillor <small>${raceMeta(w.council)}</small></h3><ul class="cands">${candList(w.council)}</ul></div>
-        <div class="race"><h3>Mayor in ward <small>${raceMeta(w.mayor)}</small></h3><ul class="cands dense">${candList(w.mayor, { colour: true, showComplete: false })}</ul></div>
+        <div class="race"><div class="race-head"><h3>Council</h3><span class="meta">${raceMeta(w.council)}</span></div>
+          <div class="scroller"><ul class="cands">${candList(w.council)}</ul></div></div>
+        <div class="race"><div class="race-head"><h3>Mayor</h3><span class="meta">${raceMeta(w.mayor)}</span></div>
+          <div class="scroller"><ul class="cands dense">${candList(w.mayor, { colour: true, showComplete: false })}</ul></div></div>
       </div>`;
+    el.querySelectorAll('.scroller').forEach((x, i) => { if (keep[i]) x.scrollTop = keep[i]; });
   }
 
   function renderCity() {
@@ -462,12 +474,9 @@
     { key: 'rep', label: 'Reporting', v: (w) => { const r = w.mayor || w.council; return r?.polls ? r.pollsReceived / r.polls : 0; } },
     { key: 'turn', label: 'Turnout', n: true, v: (w) => (w.mayor?.totalVoters ? w.mayor.votes / w.mayor.totalVoters : 0) },
     { key: 'mlead', label: 'Mayor leader', v: (w) => w.mayor?.leader?.name || '' },
-    { key: 'mpct', label: '%', n: true, v: (w) => w.mayor?.leader?.pct || 0 },
-    { key: 'mmar', label: 'Lead', n: true, v: (w) => w.mayor?.margin || 0 },
+    { key: 'mpct', label: '% · lead', n: true, v: (w) => w.mayor?.leader?.pct || 0 },
     { key: 'clead', label: 'Council leader', v: (w) => w.council?.leader?.name || '' },
-    { key: 'cpct', label: '%', n: true, v: (w) => w.council?.leader?.pct || 0 },
-    { key: 'cmar', label: 'Lead', n: true, v: (w) => w.council?.margin || 0 },
-    { key: 'ccount', label: 'Cands', n: true, v: (w) => w.council?.cands.length || 0 },
+    { key: 'cpct', label: '% · lead', n: true, v: (w) => w.council?.leader?.pct || 0 },
   ];
   function renderTable() {
     const t = $('#wardTable');
@@ -488,28 +497,43 @@
         const rp = r?.polls ? r.pollsReceived / r.polls : 0;
         return `<tr data-w="${w.num}" class="${String(w.num) === pinned ? 'pinned' : ''}${String(w.num) === hover ? ' hot' : ''}">
           <td class="n">${w.num}</td><td>${esc(w.name)}</td>
-          <td><span class="prog"><i style="width:${rp * 100}%"></i></span><span class="num">${r ? `${r.pollsReceived}/${r.polls}` : ''}</span>${r?.complete ? ' <span class="done">&#10003;</span>' : ''}</td>
+          <td><span class="num">${r ? `${r.pollsReceived}/${r.polls}` : ''}</span>${r?.complete ? ' <span class="done">&#10003;</span>' : ''}</td>
           <td class="n">${pct(COLS[3].v(w) * 100)}</td>
-          <td>${who(w.mayor, true)}</td><td class="n">${w.mayor?.leader ? pct(w.mayor.leader.pct) : ''}</td><td class="n">${w.mayor?.leader ? `${w.mayor.margin.toFixed(1)}` : ''}</td>
-          <td>${who(w.council)}</td><td class="n">${w.council?.leader ? pct(w.council.leader.pct) : ''}</td><td class="n">${w.council?.leader ? `${w.council.margin.toFixed(1)}` : ''}</td>
-          <td class="n">${w.council?.cands.length ?? ''}</td></tr>`;
+          <td>${who(w.mayor, true)}</td><td class="n">${w.mayor?.leader ? `${pct(w.mayor.leader.pct)}<span class="sub">+${w.mayor.margin.toFixed(1)}</span>` : ''}</td>
+          <td>${who(w.council)}<span class="sub">of ${w.council?.cands.length ?? 0}</span></td><td class="n">${w.council?.leader ? `${pct(w.council.leader.pct)}<span class="sub">+${w.council.margin.toFixed(1)}</span>` : ''}</td>
+          </tr>`;
       }).join('')}</tbody>`;
   }
   $('#wardTable').addEventListener('click', (e) => {
     const th = e.target.closest('th');
     if (th) { const k = th.dataset.k; sort = { key: k, dir: sort.key === k ? -sort.dir : (k === 'num' || k === 'name' || k === 'mlead' || k === 'clead' ? 1 : -1) }; renderTable(); return; }
-    const tr = e.target.closest('tbody tr'); if (tr) setPinned(tr.dataset.w);
+    const tr = e.target.closest('tbody tr'); if (tr) { setPinned(tr.dataset.w); setTab('ward'); }
   });
   $('#wardTable').addEventListener('mouseover', (e) => { const tr = e.target.closest('tbody tr'); if (tr) { setHover(tr.dataset.w); tip.classList.remove('on'); } });
   $('#wardTable').addEventListener('mouseleave', () => setHover(null));
 
+  const BOARD_SHORT = { 'Toronto District School Board': 'TDSB', 'Toronto Catholic District School Board': 'TCDSB', 'Conseil scolaire Viamonde': 'Viamonde', 'Conseil scolaire catholique MonAvenir': 'MonAvenir' };
   function renderBoards() {
-    $('#boards').innerHTML = model.boards.map((b) => `
-      <div class="board"><h3>${esc(b.name)} <span style="color:var(--muted);font-weight:400">- ${b.wards.length} trustee ward${b.wards.length === 1 ? '' : 's'} in this feed</span></h3>
-      <div class="board-grid">${b.wards.map((w) => `
-        <div class="board-ward"><h4><span>Ward ${esc(w.num)}${w.name ? ` - ${esc(w.name)}` : ''}</span><small>${fmt(w.race.pollsReceived)}/${fmt(w.race.polls)} polls - ${fmt(w.race.votes)} votes</small></h4>
-        <ul class="cands dense">${candList(w.race)}</ul></div>`).join('')}</div></div>`).join('');
+    if (!model.boards.some((b) => b.id === board)) board = model.boards[0]?.id ?? null;
+    $('#tabSchool').textContent = model.boards.length || '';
+    $('#boardTabs').innerHTML = model.boards.map((b) =>
+      `<button data-b="${b.id}" aria-pressed="${b.id === board}" title="${esc(b.name)}">${esc(BOARD_SHORT[b.name] || b.name)} <span style="opacity:.7">· ${b.wards.length}</span></button>`).join('');
+    const b = model.boards.find((x) => x.id === board);
+    $('#boards').innerHTML = b ? `<div class="board-grid">${b.wards.map((w) => `
+      <div class="board-ward"><div class="race-head"><h3>${esc(BOARD_SHORT[b.name] || b.name)} Ward ${esc(w.num)}${w.name ? ` - ${esc(w.name)}` : ''}</h3><span class="meta">${raceMeta(w.race)}</span></div>
+      <ul class="cands dense">${candList(w.race)}</ul></div>`).join('')}</div>` : '<div class="empty">No school board races in the feed.</div>';
   }
+  $('#boardTabs').addEventListener('click', (e) => { const btn = e.target.closest('button'); if (btn) { board = int(btn.dataset.b); renderBoards(); } });
+
+  // ---------- tabs ----------
+  function setTab(t) {
+    tab = t;
+    for (const b of document.querySelectorAll('.tabs button')) b.setAttribute('aria-selected', String(b.dataset.tab === t));
+    for (const p of document.querySelectorAll('#right .panel')) p.hidden = p.id !== `panel-${t}`;
+    document.body.classList.toggle('wide-right', t === 'wards' || t === 'school');
+    saveHash();
+  }
+  $('.tabs').addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) setTab(b.dataset.tab); });
 
   function renderAll() {
     flashNow = true;
@@ -524,6 +548,7 @@
     geo = g;
     buildMap();
     if (!geo.wards[pinned]) pinned = '1';
+    setTab(tab);
     renderMap(); renderWard();
     tick();
     setInterval(tick, POLL_MS);

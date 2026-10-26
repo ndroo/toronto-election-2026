@@ -80,32 +80,47 @@ header .sub { color: var(--ink-2); font-size: 12px; }
 .banner.demo { background: var(--demo); color: #fff; font-weight: 600; text-align: center; }
 .banner[hidden] { display: none; }
 
-/* Layout */
+/* Layout: on desktop the page is one screen; panels scroll inside themselves */
 main {
-  display: grid; gap: 14px; padding: 14px 16px 32px;
-  grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr) minmax(0, 0.8fr);
-  grid-template-areas: "map ward city" "table table city" "school school school";
-  align-items: start;
-  max-width: 1800px; margin: 0 auto;
+  display: grid; gap: 12px; padding: 12px 16px;
+  grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr);
+  max-width: 1800px; margin: 0 auto; width: 100%;
 }
-@media (max-width: 1280px) {
-  main { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-areas: "map map" "ward city" "table table" "school school"; }
+#left { display: flex; flex-direction: column; gap: 12px; min-width: 0; min-height: 0; }
+#right { display: flex; flex-direction: column; min-width: 0; min-height: 0; padding: 0; }
+@media (min-width: 901px) {
+  html, body { height: 100%; }
+  body { display: flex; flex-direction: column; overflow: hidden; }
+  main { flex: 1; min-height: 0; }
+  #cityCard { flex: 1; min-height: 140px; display: flex; flex-direction: column; }
+  #cityCard .scroller { flex: 1; min-height: 0; overflow: auto; margin-right: -8px; padding-right: 8px; }
+  .panel { flex: 1; min-height: 0; overflow: auto; }
+  #panel-ward:not([hidden]) { display: flex; flex-direction: column; overflow: hidden; }
+  .races { flex: 1; min-height: 0; }
+  .race { display: flex; flex-direction: column; min-height: 0; }
+  .race .scroller { flex: 1; min-height: 0; overflow: auto; margin-right: -8px; padding-right: 8px; }
+  svg#map { max-height: 40vh; }
+  body.wide-right main { grid-template-columns: minmax(0, 0.68fr) minmax(0, 1.32fr); }
+  #mapCard .card-head { margin-bottom: 4px; }
 }
-@media (max-width: 760px) {
-  main { grid-template-columns: minmax(0, 1fr); grid-template-areas: "map" "ward" "city" "table" "school"; padding: 10px 12px 28px; }
+@media (max-width: 900px) {
+  main { grid-template-columns: minmax(0, 1fr); padding: 10px 12px 24px; }
   .stats { margin-left: 0; }
+  #cityCard { order: 2; }
 }
 .card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; min-width: 0; }
 .card h2 { font-size: 13px; margin: 0; font-weight: 650; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-2); }
 .card-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; }
 .card-head .meta { color: var(--muted); font-size: 12px; margin-left: auto; font-variant-numeric: tabular-nums; }
-#mapCol { grid-area: map; align-self: stretch; }
-#wardCard { grid-area: ward; }
-#cityCol { grid-area: city; align-self: stretch; }
-#tableCard { grid-area: table; }
-#schoolCard { grid-area: school; }
-@media (min-width: 761px) { #mapCard { position: sticky; top: 72px; } }
-@media (min-width: 1281px) { #cityCard { position: sticky; top: 72px; max-height: calc(100vh - 86px); overflow: auto; } }
+
+/* Tabs */
+.tabs { display: flex; gap: 2px; padding: 6px 8px 0; border-bottom: 1px solid var(--border); overflow-x: auto; flex: none; }
+.tabs button { border: 0; background: none; padding: 8px 12px 9px; cursor: pointer; font-size: 13px; font-weight: 600; color: var(--muted); border-bottom: 2px solid transparent; margin-bottom: -1px; white-space: nowrap; }
+.tabs button:hover { color: var(--ink); }
+.tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--ink); }
+.tabs .count { font-weight: 400; color: var(--muted); margin-left: 4px; font-variant-numeric: tabular-nums; }
+.panel { padding: 12px 14px; }
+.panel[hidden] { display: none; }
 
 /* Map */
 .modes { display: inline-flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; margin-left: auto; }
@@ -135,44 +150,51 @@ svg#map .lbl { font-size: 15px; font-weight: 650; text-anchor: middle; dominant-
 #tip .r .pct { min-width: 44px; text-align: right; font-weight: 600; }
 
 /* Race lists */
-.ward-title { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.ward-head { flex: none; margin-bottom: 10px; }
+.ward-title { display: flex; align-items: baseline; gap: 8px; white-space: nowrap; overflow: hidden; }
 .ward-title .wn { font-size: 22px; font-weight: 700; letter-spacing: -0.02em; }
-.ward-title .wname { font-size: 18px; font-weight: 650; }
+.ward-title .wname { font-size: 18px; font-weight: 650; overflow: hidden; text-overflow: ellipsis; }
 .ward-title .pinned { font-size: 11px; color: var(--muted); }
-.ward-sub { display: flex; flex-wrap: wrap; gap: 4px 16px; color: var(--ink-2); font-size: 12px; margin: 2px 0 10px; font-variant-numeric: tabular-nums; }
-.races { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px; }
-@media (max-width: 560px) { .races { grid-template-columns: minmax(0, 1fr); } }
-.race h3 { font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--ink-2); margin: 0 0 4px; display: flex; justify-content: space-between; gap: 8px; }
-.race h3 small { text-transform: none; letter-spacing: 0; color: var(--muted); font-weight: 400; font-variant-numeric: tabular-nums; }
+.ward-sub { display: flex; flex-wrap: wrap; gap: 2px 16px; color: var(--ink-2); font-size: 12px; margin-top: 2px; font-variant-numeric: tabular-nums; }
+.races { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); gap: 18px; }
+@media (max-width: 700px) { .races { grid-template-columns: minmax(0, 1fr); } }
+.race-head { display: flex; align-items: baseline; gap: 8px; white-space: nowrap; border-bottom: 1px solid var(--axis); padding-bottom: 4px; margin-bottom: 2px; flex: none; }
+.race-head h3 { font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--ink-2); margin: 0; }
+.race-head .meta { margin-left: auto; color: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; overflow: hidden; text-overflow: ellipsis; }
 .cands { list-style: none; margin: 0; padding: 0; }
-.cand { display: grid; grid-template-columns: 8px minmax(0, 1fr) auto 46px; gap: 0 7px; align-items: center; padding: 3px 0; border-bottom: 1px solid var(--grid); position: relative; }
+.cand { display: grid; grid-template-columns: 8px minmax(0, 1fr) auto auto 46px; gap: 0 7px; align-items: center; padding: 4px 0 3px; border-bottom: 1px solid var(--grid); white-space: nowrap; }
 .cand:last-child { border-bottom: 0; }
 .cand .sw { width: 8px; height: 8px; border-radius: 2px; background: transparent; }
-.cand .nm { overflow-wrap: anywhere; }
+.cand .nm { overflow: hidden; text-overflow: ellipsis; }
 .cand .votes { color: var(--ink-2); text-align: right; font-size: 13px; }
 .cand .pct { text-align: right; font-weight: 600; }
-.cand .bar { grid-column: 2 / 5; height: 3px; background: var(--grid); border-radius: 2px; overflow: hidden; margin-top: 2px; }
+.cand .delta { color: var(--good); font-size: 11px; text-align: right; font-variant-numeric: tabular-nums; }
+.cand .bar { grid-column: 2 / -1; height: 3px; background: var(--grid); border-radius: 2px; overflow: hidden; margin-top: 3px; }
 .cand .bar i { display: block; height: 100%; background: var(--bar); border-radius: 0 2px 2px 0; transition: width .5s; }
 .cand.lead .nm { font-weight: 650; }
 .cand.lead .bar i { background: var(--ink-2); }
-.cand .delta { color: var(--good); font-size: 10px; display: block; line-height: 1; font-weight: 500; }
 .cand .tag { font-size: 10px; text-transform: uppercase; letter-spacing: .05em; border: 1px solid currentColor; border-radius: 4px; padding: 0 4px; margin-left: 6px; color: var(--good); vertical-align: 1px; }
 .cand.flash { animation: flash 1.6s ease-out; }
 @keyframes flash { from { background: color-mix(in srgb, #0ca30c 18%, transparent); } to { background: transparent; } }
-.dense .cand { padding: 2px 0; }
-.dense .cand .bar { height: 2px; }
+.dense .cand { padding: 3px 0 2px; }
+.dense .cand .bar { height: 2px; margin-top: 2px; }
 .empty { color: var(--muted); font-size: 13px; padding: 10px 0; }
 .lead-line { font-size: 12px; color: var(--ink-2); margin: 0 0 6px; }
 .lead-line b { color: var(--ink); }
+#cityCard { container-type: inline-size; }
+@container (min-width: 520px) {
+  #cityList { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); column-gap: 22px; }
+  #cityList .cand:nth-last-child(2):nth-child(odd) { border-bottom: 0; }
+}
 
 /* Ward table */
-.tblwrap { overflow-x: auto; }
-table { width: 100%; border-collapse: collapse; font-size: 13px; }
-th { text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); font-weight: 600; padding: 6px 8px; border-bottom: 1px solid var(--axis); white-space: nowrap; cursor: pointer; user-select: none; }
+table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 13px; }
+thead th { position: sticky; top: -12px; background: var(--surface); z-index: 1; }
+th { text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); font-weight: 600; padding: 6px 7px; border-bottom: 1px solid var(--axis); white-space: nowrap; cursor: pointer; user-select: none; }
 th[aria-sort] { color: var(--ink); }
 th[aria-sort="ascending"]::after { content: " \25B2"; font-size: 9px; }
 th[aria-sort="descending"]::after { content: " \25BC"; font-size: 9px; }
-td { padding: 5px 8px; border-bottom: 1px solid var(--grid); white-space: nowrap; }
+td { padding: 5px 7px; border-bottom: 1px solid var(--grid); white-space: nowrap; }
 td.n, th.n { text-align: right; font-variant-numeric: tabular-nums; }
 tbody tr { cursor: pointer; }
 tbody tr:hover, tbody tr.hot { background: var(--surface-2); }
@@ -182,19 +204,21 @@ tbody tr.pinned { box-shadow: inset 3px 0 0 var(--ink); }
 .prog { display: inline-block; width: 46px; height: 5px; background: var(--grid); border-radius: 3px; overflow: hidden; vertical-align: 1px; margin-right: 6px; }
 .prog i { display: block; height: 100%; background: var(--ink-2); }
 .done { color: var(--good); font-weight: 600; }
+td .sub { color: var(--muted); font-size: 11px; margin-left: 4px; }
 
 /* School boards */
-.boards { display: grid; gap: 16px; }
-.board h3 { margin: 0 0 6px; font-size: 13px; }
-.board-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 10px; }
+.board-tabs { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+.board-tabs button { border: 1px solid var(--border); background: var(--surface); border-radius: 999px; padding: 4px 11px; font-size: 12px; cursor: pointer; color: var(--ink-2); }
+.board-tabs button[aria-pressed="true"] { background: var(--ink); color: var(--surface); border-color: var(--ink); }
+.board-note { color: var(--muted); font-size: 12px; margin: 0 0 10px; }
+.board-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 10px; }
 .board-ward { border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; }
-.board-ward h4 { margin: 0 0 4px; font-size: 12px; display: flex; justify-content: space-between; gap: 6px; }
-.board-ward h4 small { color: var(--muted); font-weight: 400; font-variant-numeric: tabular-nums; }
-details summary { cursor: pointer; }
-details > summary h2 { display: inline; }
+.board-ward .race-head h3 { color: var(--ink); text-transform: none; letter-spacing: 0; font-size: 13px; }
 
-footer { color: var(--muted); font-size: 12px; padding: 0 16px 28px; max-width: 1800px; margin: 0 auto; }
-footer a { color: var(--ink-2); }
+/* About */
+.about { color: var(--ink-2); font-size: 13px; max-width: 70ch; }
+.about p { margin: 0 0 10px; }
+.about a { color: var(--ink); }
 .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
 </style>
 </head>
@@ -211,55 +235,55 @@ footer a { color: var(--ink-2); }
 <div id="notice" class="banner" hidden></div>
 
 <main>
-  <div id="mapCol">
-  <section class="card" id="mapCard" aria-label="Ward map">
-    <div class="card-head">
-      <h2>Wards</h2>
-      <div class="modes" role="group" aria-label="Map colouring">
-        <button data-mode="mayor" aria-pressed="true">Mayor leader</button>
-        <button data-mode="council">Council margin</button>
-        <button data-mode="reporting">Reporting</button>
-        <button data-mode="turnout">Turnout</button>
+  <div id="left">
+    <section class="card" id="mapCard" aria-label="Ward map">
+      <div class="card-head">
+        <h2>Wards</h2>
+        <div class="modes" role="group" aria-label="Map colouring">
+          <button data-mode="mayor" aria-pressed="true">Mayor leader</button>
+          <button data-mode="council">Council margin</button>
+          <button data-mode="reporting">Reporting</button>
+          <button data-mode="turnout">Turnout</button>
+        </div>
       </div>
+      <div class="mapwrap"><svg id="map" role="img" aria-label="Map of Toronto's 25 wards"></svg></div>
+      <div class="legend" id="legend"></div>
+    </section>
+
+    <section class="card" id="cityCard">
+      <div class="card-head"><h2>Mayor - city-wide</h2><span class="meta" id="cityMeta"></span></div>
+      <p class="lead-line" id="cityLead"></p>
+      <div class="scroller"><ul class="cands dense" id="cityList"></ul></div>
+    </section>
+  </div>
+
+  <section class="card" id="right">
+    <nav class="tabs" role="tablist" aria-label="Results views">
+      <button role="tab" data-tab="ward" aria-controls="panel-ward" aria-selected="true">Ward <span id="tabWard"></span></button>
+      <button role="tab" data-tab="wards" aria-controls="panel-wards" aria-selected="false">All wards<span class="count">25</span></button>
+      <button role="tab" data-tab="school" aria-controls="panel-school" aria-selected="false">School trustees<span class="count" id="tabSchool"></span></button>
+      <button role="tab" data-tab="about" aria-controls="panel-about" aria-selected="false">About the data</button>
+    </nav>
+    <div class="panel" id="panel-ward" role="tabpanel" aria-live="polite"></div>
+    <div class="panel" id="panel-wards" role="tabpanel" hidden><table id="wardTable"></table></div>
+    <div class="panel" id="panel-school" role="tabpanel" hidden>
+      <div class="board-tabs" id="boardTabs" role="group" aria-label="School board"></div>
+      <p class="board-note">Trustee wards are drawn differently from the 25 city wards, so they are not shown on the map.</p>
+      <div id="boards"></div>
     </div>
-    <div class="mapwrap"><svg id="map" role="img" aria-label="Map of Toronto's 25 wards"></svg></div>
-    <div class="legend" id="legend"></div>
-    <div class="hint">Hover a ward to preview both races. Click to pin it.</div>
-  </section>
-  </div>
-
-  <section class="card" id="wardCard" aria-live="polite">
-    <div id="wardPanel"></div>
-  </section>
-
-  <div id="cityCol">
-  <section class="card" id="cityCard">
-    <div class="card-head"><h2>Mayor - city-wide</h2><span class="meta" id="cityMeta"></span></div>
-    <p class="lead-line" id="cityLead"></p>
-    <ul class="cands dense" id="cityList"></ul>
-  </section>
-  </div>
-
-  <section class="card" id="tableCard">
-    <div class="card-head"><h2>All wards</h2><span class="meta">Click a column to sort</span></div>
-    <div class="tblwrap"><table id="wardTable"></table></div>
-  </section>
-
-  <section class="card" id="schoolCard">
-    <div class="card-head"><h2>School board trustees</h2><span class="meta">Trustee wards differ from city wards</span></div>
-    <div class="boards" id="boards"></div>
+    <div class="panel about" id="panel-about" role="tabpanel" hidden>
+      <p>Source: City of Toronto unofficial results feeds
+      (<a href="https://mediaresults.toronto.ca/results/unofficialresult.json">all offices</a>,
+      <a href="https://mediaresults.toronto.ca/results/unofficialresult-wardbyward.json">mayor by ward</a>).
+      The City updates them about every 60 seconds from 8 p.m. on election night; this page checks every 30 seconds.</p>
+      <p>The City's feed does not allow cross-origin browser requests, so it is passed through a Cloudflare Worker (cached up to 15 seconds), with a GitHub Actions copy as backup.</p>
+      <p>Results are unofficial until certified by the City Clerk. Advance-vote results are folded into ward totals on election night; results by voting place are published on Open Data after certification.</p>
+      <p>Map colours: the top three mayoral candidates city-wide get a colour each; a ward led by anyone else, or tied, is grey. Darker means a wider lead in that ward.</p>
+      <p>Ward boundaries: <a href="https://open.toronto.ca/dataset/city-wards/">Toronto Open Data</a>, 25-ward model.</p>
+      <p id="srcInfo"></p>
+    </div>
   </section>
 </main>
-
-<footer>
-  Source: City of Toronto unofficial results feeds
-  (<a href="https://mediaresults.toronto.ca/results/unofficialresult.json">all offices</a>,
-  <a href="https://mediaresults.toronto.ca/results/unofficialresult-wardbyward.json">mayor by ward</a>),
-  passed through a Cloudflare Worker (cached up to 15 seconds) because the City's feed does not allow cross-origin browser requests, with a GitHub Actions copy as backup.
-  Results are unofficial until certified by the City Clerk. Advance-vote results are folded into ward totals on election night.
-  Ward boundaries: <a href="https://open.toronto.ca/dataset/city-wards/">Toronto Open Data</a>.
-  <span id="srcInfo"></span>
-</footer>
 
 <div id="tip" role="tooltip"></div>
 <script src="app.js"></script>
