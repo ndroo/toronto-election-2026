@@ -147,7 +147,7 @@
   }
 
   // ---------- race calls ----------
-  // status: awaiting | leading | tied | projected | decided | official, with a plain-English reason.
+  // status: awaiting | early | close | tied | projected | decided | official, with a plain-English reason.
   function callRace(r, estLeft) {
     if (!r || !r.cands.length) return null;
     const [a, b] = r.cands;
@@ -165,21 +165,33 @@
     const hasNow = b.votes / (a.votes + b.votes); // runner-up's share of the top-two vote so far
     const why = `${b.name} would need ${need > 1 ? 'more than all' : `${Math.round(need * 100)}%`} of an estimated ${fmt(Math.round(topTwo))} votes still to come between the top two, and has ${Math.round(hasNow * 100)}% so far`;
     const rep = r.pollsReceived / r.polls;
-    if (rep < CALL.minReporting) return { status: 'leading', need, reason: `Too early to call - ${pct(rep * 100, 0)} of polls in, calls start at ${CALL.minReporting * 100}%` };
-    return { status: need >= CALL.needShare || need - hasNow >= CALL.swing ? 'projected' : 'leading', need, reason: why };
+    if (rep < CALL.minReporting) return { status: 'early', need, reason: `Only ${pct(rep * 100, 0)} of polls are in. Calls start at ${CALL.minReporting * 100}%.` };
+    return { status: need >= CALL.needShare || need - hasNow >= CALL.swing ? 'projected' : 'close', need, reason: why };
   }
-  const CALL_LABEL = { official: '&#10003; Official winner', decided: '&#10003; Decided &middot; unofficial', projected: '&#9670; Projected winner', leading: 'Leading', tied: 'Tied', awaiting: 'Awaiting results' };
+  const CALL_LABEL = { official: '&#10003; Official winner', decided: '&#10003; Winner &middot; unofficial', projected: '&#9670; Projected winner', close: 'Too close to call', early: 'Too early to call', tied: 'Tied', awaiting: 'No results yet' };
   const CALLED = new Set(['projected', 'decided', 'official']);
   // One definition per label, shared by the hover card and the Methodology tab.
   const CALL_DEF = {
     awaiting: 'No polls in this race have reported yet.',
-    leading: `Ahead, but not by enough to call. No race is called until at least ${CALL.minReporting * 100}% of its polls are in.`,
+    early: `Fewer than ${CALL.minReporting * 100}% of this race's polls have reported, so no call is made yet, however big the lead. The candidate listed first is ahead for now.`,
+    close: `Enough polls are in to consider a call, but the runner-up could still realistically catch up. The candidate listed first is ahead for now.`,
     tied: 'The top two candidates have exactly the same number of votes.',
     projected: `This page's estimate, not an official result: at least ${CALL.minReporting * 100}% of polls are in, and to catch up the runner-up would need ${CALL.needShare * 100}% or more of the remaining votes between the top two, or a share ${CALL.swing * 100} or more points higher than they have managed so far.`,
-    decided: 'Settled by the numbers: all polls are in, the lead is bigger than every elector not yet counted, or only one candidate is running. Still unofficial until the City Clerk certifies.',
+    decided: 'The result can no longer change: all polls are in, the lead is bigger than every elector not yet counted, or only one candidate is running. Still unofficial until the City Clerk certifies.',
     official: 'The City Clerk has certified the results. This is set by hand once certified results are posted; the feed never says it.',
   };
-  const badge = (call) => call ? `<button class="call call-${call.status}" data-method data-status="${call.status}" data-reason="${esc(call.reason)}" aria-label="${CALL_LABEL[call.status].replace(/&[^;]+;\s*/g, '')}: ${esc(call.reason)}">${CALL_LABEL[call.status]}</button>` : '';
+  const badge = (call) => call ? `<button class="call call-${call.status}" data-status="${call.status}" data-reason="${esc(call.reason)}" aria-label="${CALL_LABEL[call.status].replace(/&[^;]+;\s*/g, '')}: ${esc(call.reason)}. Show explanation.">${CALL_LABEL[call.status]}<span class="i" aria-hidden="true">i</span></button>` : '';
+  // Status pill + plain sentence about the lead, then the reason underneath.
+  function callRow(r) {
+    if (!r) return '';
+    const [a, b] = r.cands;
+    let txt;
+    if (!r.leader) txt = `${r.cands.length} candidate${r.cands.length === 1 ? '' : 's'} · no votes counted yet`;
+    else if (r.tied) txt = `<b>${esc(a.name)}</b> and <b>${esc(b.name)}</b> are tied at ${fmt(a.votes)}`;
+    else if (!b) txt = `<b>${esc(a.name)}</b> is the only candidate`;
+    else txt = `<b>${esc(a.name)}</b> leads ${esc(b.name)} by <b>${fmt(a.votes - b.votes)}</b> votes (${(a.pct - b.pct).toFixed(1)} pts)`;
+    return `<div class="callrow">${badge(r.call)}<span class="lead-txt">${txt}</span></div>${why(r.call)}`;
+  }
   const why = (call) => call && call.status !== 'awaiting' ? `<div class="call-why">${esc(call.reason)}</div>` : '';
 
   function renderMethod() {
@@ -196,21 +208,21 @@
       <section id="m-disclaimer"><h3>Disclaimer</h3>
       <div class="disclaimer-box">
         <p>This page was made by <a href="https://andrewmcgrath.info">Andrew McGrath</a> and is offered as an ad-free alternative to mainstream media platforms. It is not affiliated with the City of Toronto.</p>
-        <p>All results come from the City of Toronto's unofficial results feed and are unofficial until certified by the City Clerk. Race calls ("Projected winner", "Decided") are this page's own estimates using the method below, not official results or City announcements.</p>
+        <p>All results come from the City of Toronto's unofficial results feed and are unofficial until certified by the City Clerk. Race calls ("Projected winner", "Winner · unofficial") are this page's own estimates using the method below, not official results or City announcements.</p>
         <p>This page is provided as is, without representations or warranties of any kind. We take no responsibility for the accuracy, completeness or timeliness of the data or projections. For official results, see the <a href="https://www.toronto.ca/city-government/elections/">City of Toronto elections website</a>.</p>
       </div>
       </section>
 
       <section id="m-calls"><h3>Race calls</h3>
       <p><b>The City's feed only reports unofficial vote counts. It never says a race is decided.</b> Every label below is this page's own estimate, recalculated each time the feed updates. News outlets may call races sooner or later using other information.</p>
-      <dl class="calls">${['awaiting', 'leading', 'tied', 'projected', 'decided', 'official'].map((st) => `<dt>${ex(st)}</dt><dd>${CALL_DEF[st]}</dd>`).join('')}</dl>
+      <dl class="calls">${['awaiting', 'early', 'close', 'tied', 'projected', 'decided', 'official'].map((st) => `<dt>${ex(st)}</dt><dd>${CALL_DEF[st]}</dd>`).join('')}</dl>
       <p><b>The projection, step by step</b></p>
       <ol>
         <li>Wait until at least <b>${CALL.minReporting * 100}%</b> of the race's polls have reported.</li>
         <li>Estimate the votes still to come: average votes per poll so far × polls not yet reported. For mayor this is done ward by ward and added up, so a big ward reporting late is not underestimated.</li>
         <li>Multiply that estimate by <b>${CALL.safety}</b> as a safety margin, and cap it at the number of electors not yet counted.</li>
         <li>Assume the top two keep the same combined share of those votes they have so far, and work out what share of them the runner-up needs to draw level.</li>
-        <li>If the runner-up would need <b>${CALL.needShare * 100}% or more</b> of those votes, or a share at least <b>${CALL.swing * 100} points higher</b> than their share of the top-two vote so far (for example 40% when they have had 8%), the leader is shown as <span class="call call-projected">${CALL_LABEL.projected}</span>. Below that, <span class="call call-leading">Leading</span>. Every badge shows the actual figure for that race when you hover it.</li>
+        <li>If the runner-up would need <b>${CALL.needShare * 100}% or more</b> of those votes, or a share at least <b>${CALL.swing * 100} points higher</b> than their share of the top-two vote so far (for example 40% when they have had 8%), the leader is shown as <span class="call call-projected">${CALL_LABEL.projected}</span>. Otherwise it stays <span class="call call-close">${CALL_LABEL.close}</span>. Every badge shows the actual figure for that race when you hover it.</li>
       </ol>
       <p>Only the city-wide mayor's race is called. The mayor results shown for each ward are the votes cast there, not a separate race. Council and school trustee races are each called on their own numbers.</p>
       <p><b>Official results:</b> ${OFFICIAL.certified ? `certified by the City Clerk on ${esc(OFFICIAL.certified)}.` : 'not certified yet.'} Certification happens after election night and is posted on the <a href="${OFFICIAL.url}">City's election results page</a>. The page is switched to "Official winner" by hand at that point.</p>
@@ -254,33 +266,38 @@
     if (b) { setTab('method'); document.getElementById(b.dataset.goto).scrollIntoView({ block: 'start' }); }
   });
 
-  // Hover card for call badges: definition + this race's own numbers.
+  // Explanation card for call badges: definition + this race's own numbers.
+  // Hover shows it; click/tap keeps it open; the link inside goes to the methodology.
   const callTip = $('#callTip');
+  let tipHide = null, tipPinned = false;
   function showCallTip(el) {
     const st = el.dataset.status;
     if (!st) return;
+    clearTimeout(tipHide);
     callTip.innerHTML = `<span class="call call-${st}">${CALL_LABEL[st]}</span><p class="def">${CALL_DEF[st]}</p>
-      ${el.dataset.reason ? `<div class="this"><b>This race</b>${el.dataset.reason}</div>` : ''}<div class="more">Click for the full methodology</div>`;
+      ${el.dataset.reason ? `<div class="this"><b>This race</b>${el.dataset.reason}</div>` : ''}
+      <button class="linkish more" data-goto="m-calls">How races are called &rarr;</button>`;
     const r = el.getBoundingClientRect();
     callTip.classList.add('on');
     const w = callTip.offsetWidth, h = callTip.offsetHeight;
-    let left = Math.min(innerWidth - w - 8, Math.max(8, r.left + r.width / 2 - w / 2));
-    let top = r.bottom + 8;
-    if (top + h > innerHeight - 8) top = r.top - h - 8;
+    const left = Math.min(innerWidth - w - 8, Math.max(8, r.left + r.width / 2 - w / 2));
+    let top = r.bottom + 6;
+    if (top + h > innerHeight - 8) top = r.top - h - 6;
     callTip.style.left = `${left}px`; callTip.style.top = `${top}px`;
   }
-  const hideCallTip = () => callTip.classList.remove('on');
-  document.addEventListener('pointerover', (e) => { const el = e.target.closest('.call[data-status]'); if (el) showCallTip(el); });
-  document.addEventListener('pointerout', (e) => { if (e.target.closest('.call[data-status]')) hideCallTip(); });
-  document.addEventListener('focusin', (e) => { const el = e.target.closest('.call[data-status]'); if (el) showCallTip(el); });
-  document.addEventListener('focusout', hideCallTip);
+  function hideCallTip() { clearTimeout(tipHide); tipPinned = false; callTip.classList.remove('on'); }
+  const hideSoon = () => { if (!tipPinned) { clearTimeout(tipHide); tipHide = setTimeout(hideCallTip, 180); } };
+  document.addEventListener('pointerover', (e) => { const el = e.target.closest('.call[data-status]'); if (el && e.pointerType !== 'touch' && !tipPinned) showCallTip(el); });
+  document.addEventListener('pointerout', (e) => { if (e.target.closest('.call[data-status]')) hideSoon(); });
+  callTip.addEventListener('pointerenter', () => clearTimeout(tipHide));
+  callTip.addEventListener('pointerleave', hideSoon);
   document.addEventListener('click', (e) => {
-    if (!e.target.closest('[data-method]')) return;
-    e.stopPropagation();
-    hideCallTip();
-    setTab('method');
-    document.getElementById('m-calls').scrollIntoView({ block: 'start' });
-  }, true);
+    const el = e.target.closest('.call[data-status]');
+    if (el) { showCallTip(el); tipPinned = true; return; }
+    if (!e.target.closest('#callTip') || e.target.closest('[data-goto]')) hideCallTip();
+  });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') hideCallTip(); });
+  document.addEventListener('focusin', (e) => { const el = e.target.closest('.call[data-status]'); if (el) showCallTip(el); });
 
   function assignColours() {
     const top = model.mayor.cands.filter((c) => c.votes > 0).slice(0, 3).map((c) => c.name);
@@ -538,7 +555,7 @@
       const lead = r.leader && i === 0 && !r.tied;
       const col = colour ? candColour(c.name) : null;
       const st = r.call?.status;
-      const tag = lead && showCall && CALLED.has(st) ? `<span class="tag tag-${st}">${{ projected: 'Projected', decided: 'Decided', official: 'Official' }[st]}</span>` : '';
+      const tag = lead && showCall && CALLED.has(st) ? `<span class="tag tag-${st}">${{ projected: 'Projected', decided: 'Winner', official: 'Official' }[st]}</span>` : '';
       return `<li class="cand${lead ? ' lead' : ''}${c.delta && flashNow ? ' flash' : ''}" title="${esc(c.name)}: ${fmt(c.votes)} votes (${pct(c.pct, 2)})${c.delta ? `, +${fmt(c.delta)} since last update` : ''}">
         <span class="sw" style="background:${col || 'transparent'}"></span>
         <span class="nm">${esc(c.name)}${tag}</span>
@@ -572,7 +589,7 @@
           <span>${fmt(rep.totalVoters)} electors</span>` : ''}</div>
       </div>
       <div class="races">
-        <div class="race"><div class="race-head"><h3>Council</h3>${badge(w.council?.call)}<span class="meta">${raceMeta(w.council)}</span></div>${why(w.council?.call)}
+        <div class="race"><div class="race-head"><h3>Council</h3><span class="meta">${raceMeta(w.council)}</span></div>${callRow(w.council)}
           <div class="scroller"><ul class="cands">${candList(w.council)}</ul></div></div>
         <div class="race"><div class="race-head"><h3>Mayor</h3><span class="meta">${raceMeta(w.mayor)}</span></div><div class="call-why">Votes cast in this ward. The mayor's race is called city-wide.</div>
           <div class="scroller"><ul class="cands dense">${candList(w.mayor, { colour: true, showCall: false })}</ul></div></div>
@@ -583,14 +600,19 @@
   function renderCity() {
     const r = model.mayor;
     $('#cityMeta').textContent = raceMeta(r);
-    $('#cityBadge').innerHTML = badge(r.call);
-    $('#cityWhy').innerHTML = why(r.call);
-    const [a, b] = r.cands;
-    $('#cityLead').innerHTML = r.leader
-      ? (r.tied ? `<b>Tied</b> at ${fmt(a.votes)} votes` : `<b>${esc(a.name)}</b> leads ${esc(b?.name || '')} by <b>${fmt(a.votes - (b?.votes || 0))}</b> votes (${(a.pct - (b?.pct || 0)).toFixed(1)} pts)`)
-        + ` - ${r.cands.length} candidates`
-      : `${r.cands.length} candidates - no votes reported yet`;
+    $('#cityCall').innerHTML = callRow(r);
     $('#cityList').innerHTML = candList(r, { colour: true });
+  }
+
+  // Header mayor stat: the leader's name, with what kind of lead it is spelled out underneath.
+  function mayorStat(r) {
+    const st = r.call?.status;
+    const name = r.leader && !r.tied ? esc(r.leader.name) : '';
+    const blank = '<span class="meter blank"></span>';
+    if (!name) return ['Mayor', st === 'tied' ? 'Tied' : 'Results after 8 p.m.', blank];
+    const v = { projected: `&#9670; ${name}`, decided: `&#10003; ${name}`, official: `&#10003; ${name}` }[st] || name;
+    const l = { projected: 'projected winner', decided: 'winner (unofficial)', official: 'official winner' }[st] || 'ahead, not called yet';
+    return [`Mayor · <span class="st st-${st}">${l}</span>`, v, blank];
   }
 
   function renderStats() {
@@ -600,7 +622,7 @@
     const council = wards.map((w) => w.council?.call?.status);
     const called = council.filter((x) => CALLED.has(x)).length;
     const s = [
-      ['Mayor', badge(r.call), '<span class="meter blank"></span>'],
+      mayorStat(r),
       ['Council called', `${called}/${wards.length}`, meter(wards.length ? called / wards.length : 0, called === wards.length)],
       [`Polls reporting · ${pct(r.polls ? (r.pollsReceived / r.polls) * 100 : 0, 0)}`, `${fmt(r.pollsReceived)}/${fmt(r.polls)}`, meter(r.polls ? r.pollsReceived / r.polls : 0, r.complete)],
       ['Wards complete', `${wardsDone}/${wards.length}`, meter(wards.length ? wardsDone / wards.length : 0, wards.length > 0 && wardsDone === wards.length)],
@@ -625,7 +647,8 @@
       else if (!DEMO && relayAge > STALE_MS) { st.classList.add('stale'); tx.textContent = `Relay delayed - last checked ${ago(relayAge)}`; }
       else if (r.complete) { st.classList.add('live'); tx.textContent = `All polls in · ${gen}`; }
       else if (r.pollsReceived > 0) { st.classList.add('live'); tx.textContent = `Live · ${gen}`; }
-      else { tx.textContent = `Polls close 8 p.m. · feed ${gen}`; }
+      else { tx.textContent = 'Waiting for results · polls close 8 p.m.'; }
+      st.title = `Feed generated ${gen}`;
       if (usedSource === 'raw') note = 'GitHub API limit reached for your network - using a backup copy that can lag up to 5 minutes.';
       $('#srcInfo').textContent = ` Feed seq ${model.seq}${model.relayedAt ? `, relay checked ${time(model.relayedAt)}` : ''}${model.changedAt ? `, last change ${time(model.changedAt)}` : ''}.`;
     }

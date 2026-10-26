@@ -238,14 +238,24 @@ td .sub2 { color: var(--muted); font-size: 11px; margin-top: 1px; font-variant-n
 .call { font: 650 11px/1 system-ui, -apple-system, "Segoe UI", sans-serif; letter-spacing: .01em; padding: 4px 8px; border-radius: 999px; border: 1px solid var(--axis); background: var(--surface); color: var(--ink-2); cursor: pointer; white-space: nowrap; text-transform: none; vertical-align: 1px; }
 .call:hover { filter: brightness(1.08); }
 .call-awaiting { color: var(--muted); border-style: dashed; }
+.call-early, .call-close { color: var(--ink-2); }
+.call .i { display: inline-grid; place-items: center; width: 13px; height: 13px; margin-left: 6px; margin-right: -2px; border-radius: 50%; border: 1px solid currentColor; font: italic 700 9px/1 Georgia, serif; opacity: .75; vertical-align: -1px; }
+#callTip > .call .i, dl.calls .call .i { display: none; }
 .call-tied { color: var(--critical); border-color: currentColor; }
 .call-projected { background: var(--ink); color: var(--surface); border-color: var(--ink); }
 .call-decided, .call-official { background: var(--good-fill); color: #fff; border-color: var(--good-fill); }
 .call-official { box-shadow: 0 0 0 3px color-mix(in srgb, var(--good-fill) 28%, transparent); }
-.call-why { font-size: 11.5px; color: var(--ink-2); margin: 3px 0 6px; line-height: 1.35; }
+.callrow { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; margin: 6px 0 0; min-width: 0; }
+.callrow .lead-txt { font-size: 12.5px; color: var(--ink-2); line-height: 1.35; }
+.callrow .lead-txt b { color: var(--ink); }
+.call-why { font-size: 11.5px; color: var(--muted); margin: 3px 0 6px; line-height: 1.35; }
 #cityCard .card-head .call { align-self: center; }
 .stat .call { align-self: flex-start; margin: 1px 0; }
-.stat:first-child { min-width: 150px; }
+.stat:first-child { min-width: 170px; }
+@media (min-width: 1200px) { header.top { flex-wrap: nowrap; } .stats { flex-wrap: nowrap; } }
+.stat .st { text-transform: none; letter-spacing: 0; }
+.stat .st-projected { color: var(--ink); font-weight: 650; }
+.stat .st-decided, .stat .st-official { color: var(--good-fill); font-weight: 650; }
 .tag.tag-projected { color: var(--ink); }
 .tag.tag-decided, .tag.tag-official { color: var(--good-fill); }
 .ico { display: inline-block; width: 14px; text-align: center; font-size: 11px; margin-right: 2px; }
@@ -259,8 +269,9 @@ dl.calls dd { margin: 0; }
 .about h3 { font-size: 15px; color: var(--ink); margin: 18px 0 8px; }
 #method { scroll-margin-top: 8px; }
 
-#callTip { position: fixed; z-index: 60; pointer-events: none; width: 300px; background: var(--surface); color: var(--ink); border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 8px 28px rgba(0,0,0,.2); padding: 10px 12px; font-size: 12.5px; line-height: 1.4; opacity: 0; transform: translateY(4px); transition: opacity .12s, transform .12s; }
-#callTip.on { opacity: 1; transform: none; }
+#callTip { position: fixed; z-index: 60; pointer-events: none; visibility: hidden; width: 300px; background: var(--surface); color: var(--ink); border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 8px 28px rgba(0,0,0,.2); padding: 10px 12px; font-size: 12.5px; line-height: 1.4; opacity: 0; transform: translateY(4px); transition: opacity .12s, transform .12s; }
+#callTip.on { opacity: 1; transform: none; pointer-events: auto; visibility: visible; }
+#callTip .more { display: inline-block; margin-top: 8px; font-size: 12px; }
 #callTip .def { color: var(--ink-2); margin: 7px 0 0; }
 #callTip .this { margin: 8px 0 0; padding-top: 8px; border-top: 1px solid var(--grid); }
 #callTip .this b { display: block; font-size: 10.5px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin-bottom: 2px; }
@@ -268,7 +279,9 @@ dl.calls dd { margin: 0; }
 .call { transition: transform .12s, box-shadow .12s; }
 .call:hover, .call:focus-visible { transform: translateY(-1px); box-shadow: 0 2px 8px rgba(0,0,0,.18); outline: none; }
 
-footer.disclaimer { flex: none; padding: 7px 16px 9px; font-size: 11.5px; color: var(--muted); border-top: 1px solid var(--border); text-align: center; line-height: 1.45; }
+footer.disclaimer { flex: none; display: flex; justify-content: space-between; gap: 6px 18px; padding: 6px 16px; font-size: 11px; color: var(--muted); border-top: 1px solid var(--border); line-height: 1.4; white-space: nowrap; overflow: hidden; }
+footer.disclaimer span { overflow: hidden; text-overflow: ellipsis; }
+@media (max-width: 1100px) { footer.disclaimer { flex-wrap: wrap; justify-content: center; white-space: normal; } }
 footer.disclaimer a, footer.disclaimer .linkish { color: var(--ink-2); font-size: inherit; }
 .disclaimer-box { border: 1px solid var(--axis); border-radius: 8px; padding: 10px 12px; background: var(--surface-2); }
 .disclaimer-box p { margin: 0 0 6px; }
@@ -316,9 +329,8 @@ footer.disclaimer a, footer.disclaimer .linkish { color: var(--ink-2); font-size
     </section>
 
     <section class="card" id="cityCard">
-      <div class="card-head"><h2>Mayor - city-wide</h2><span id="cityBadge"></span><span class="meta" id="cityMeta"></span></div>
-      <p class="lead-line" id="cityLead"></p>
-      <div id="cityWhy"></div>
+      <div class="card-head"><h2>Mayor - city-wide</h2><span class="meta" id="cityMeta"></span></div>
+      <div id="cityCall"></div>
       <div class="scroller"><ul class="cands dense" id="cityList"></ul></div>
     </section>
   </div>
@@ -332,7 +344,7 @@ footer.disclaimer a, footer.disclaimer .linkish { color: var(--ink-2); font-size
     </nav>
     <div class="panel" id="panel-ward" role="tabpanel" aria-live="polite"></div>
     <div class="panel" id="panel-wards" role="tabpanel" hidden><table id="wardTable"></table>
-      <p class="table-key"><span class="ico ico-projected">&#9670;</span> Projected winner &nbsp; <span class="ico ico-decided">&#10003;</span> Decided (unofficial) &nbsp; <button class="linkish" data-method>How races are called</button></p></div>
+      <p class="table-key"><span class="ico ico-projected">&#9670;</span> Projected winner &nbsp; <span class="ico ico-decided">&#10003;</span> Winner (unofficial) &nbsp; <button class="linkish" data-goto="m-calls">How races are called</button></p></div>
     <div class="panel" id="panel-school" role="tabpanel" hidden>
       <div class="board-tabs" id="boardTabs" role="group" aria-label="School board"></div>
       <p class="board-note">Trustee wards are drawn differently from the 25 city wards, so they are not shown on the map.</p>
@@ -346,10 +358,11 @@ footer.disclaimer a, footer.disclaimer .linkish { color: var(--ink-2); font-size
 </main>
 
 <footer class="disclaimer">
-  Made by <a href="https://andrewmcgrath.info">Andrew McGrath</a> as an ad-free alternative to mainstream media.
-  Data: City of Toronto unofficial results. Projections are our own estimates (<button class="linkish" data-goto="m-calls">methodology</button>).
-  Provided as is, without representations or warranties; we take no responsibility for the data.
-  Official results: <a href="https://www.toronto.ca/city-government/elections/">toronto.ca/elections</a>.
+  <span>Made by <a href="https://andrewmcgrath.info">Andrew McGrath</a> · ad-free alternative to mainstream media</span>
+  <span>Data: City of Toronto unofficial results</span>
+  <span>Calls are our estimates · <button class="linkish" data-goto="m-disclaimer">methodology</button></span>
+  <span>Provided as is, without representations or warranties; no responsibility for the data</span>
+  <span>Official: <a href="https://www.toronto.ca/city-government/elections/">toronto.ca/elections</a></span>
 </footer>
 
 <div id="tip" role="tooltip"></div>
