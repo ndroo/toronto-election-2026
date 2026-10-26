@@ -149,6 +149,9 @@ svg#map .lbl { font-size: 15px; font-weight: 650; text-anchor: middle; dominant-
 .legend { font-size: 12px; color: var(--ink-2); margin-top: 8px; }
 .lg-row { display: flex; gap: 6px 14px; align-items: center; height: 20px; white-space: nowrap; overflow: hidden; }
 .lg-note { color: var(--muted); margin-top: 3px; }
+.lg-toggle { display: inline-flex; align-items: center; gap: 4px; color: var(--ink-2); cursor: pointer; }
+.lg-toggle[hidden] { display: none; }
+.lg-toggle input { margin: 0; accent-color: var(--ink); }
 @media (max-width: 900px) { .lg-row { height: auto; min-height: 20px; flex-wrap: wrap; white-space: normal; } }
 .legend .sw { display: inline-block; width: 12px; height: 12px; border-radius: 3px; vertical-align: -2px; margin-right: 5px; }
 .legend .ramp { display: inline-flex; height: 10px; width: 140px; border-radius: 3px; overflow: hidden; margin: 0 6px; }

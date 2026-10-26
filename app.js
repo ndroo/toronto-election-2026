@@ -259,7 +259,7 @@
 
       <section id="m-photos"><h3>Candidate photos</h3>
       <p>Photos were taken from each candidate's own campaign website or social page, as listed on the <a href="https://www.toronto.ca/city-government/elections/candidate-list/">City's candidate list</a>, and cropped automatically around the face. Each crop was then checked by hand, and images that weren't clearly a headshot of the candidate were dropped. Candidates without a usable photo are shown with their initials. If a photo is wrong, contact <a href="https://andrewmcgrath.info">Andrew McGrath</a>.</p>
-      <p>On the map, the Mayor and Council views show the top three candidates at each ward's centre. The leader is largest and in front. Others shrink with their vote share relative to the leader and are dropped once they have less than ${FACE_MIN_RATIO * 100}% of the leader's votes.</p>
+      <p>On the map, the Mayor and Council views show the leading candidate's photo at each ward's centre. When the race there is close (the runner-up has at least ${FACE_CLOSE * 100}% of the leader's votes), a smaller photo of the runner-up appears behind. Wards whose leader has no photo show just the ward number. Use the Faces switch under the map to turn photos off.</p>
       </section>
 
       <section id="m-limits"><h3>Limits</h3>
@@ -360,7 +360,9 @@
   function demoize(b) {
     // Synthetic numbers on the real candidate lists - layout preview only.
     const rnd = (s) => { let h = 2166136261; for (const ch of s) h = Math.imul(h ^ ch.charCodeAt(0), 16777619); return ((h >>> 0) % 10000) / 10000; };
-    const weight = (name, ward) => Math.pow(rnd(name), 6) * 8 + rnd(name + ward) * 0.6 + 0.02;
+    // Candidates with a campaign photo tend to be the established campaigns, so the demo favours them.
+    const hasPhoto = (name) => Object.keys(photos).some((k) => k.endsWith(`|${normName(name)}`));
+    const weight = (name, ward) => (Math.pow(rnd(name), 6) * 8 + rnd(name + ward) * 0.6 + 0.02) * (hasPhoto(name) ? 3 + rnd(name + 'p') * 6 : 1);
     const fill = (w, cands, key, p) => {
       w.pollsReceived = String(Math.min(int(w.polls), Math.round(int(w.polls) * clamp(p + (rnd(key.replace(/^\w+\|/, '')) - 0.5) * 0.3))));
       const cast = Math.round(int(w.totalVoters) * 0.33 * (int(w.pollsReceived) / Math.max(1, int(w.polls))));
@@ -496,34 +498,32 @@
     renderLegend();
   }
 
-  // Top three faces at each ward's centre for the mayor and council views. The leader is largest and on top;
-  // the others shrink with their share relative to the leader and drop out once they trail badly.
-  const FACE_MIN_RATIO = 0.4;
+  // Leader's photo at each ward's centre (mayor and council views). A smaller runner-up appears behind
+  // only when the race is close. Wards whose leader has no photo just show the ward number.
+  const FACE_CLOSE = 0.85; // runner-up shown when they have at least 85% of the leader's votes
+  let showFaces = true;
+  try { showFaces = localStorage.getItem('faces') !== 'off'; } catch {}
   function renderFaces() {
     const parts = [];
     let clipId = 0;
-    const show = (mode === 'mayor' || mode === 'council') && model;
+    const on = showFaces && (mode === 'mayor' || mode === 'council') && model;
     for (const [num, g] of Object.entries(geo.wards)) {
       const lbl = svg.querySelector(`.lbl[data-n="${num}"]`);
-      const w = show ? model.wards[num] : null;
-      const r = w && (mode === 'mayor' ? w.mayor : w.council);
-      const top = r?.leader ? r.cands.filter((c) => c.votes > 0).slice(0, 3) : [];
-      if (!top.length) { lbl.setAttribute('y', g.ly); lbl.classList.remove('small'); continue; }
-      const r1 = clamp(wardSize[num] * 0.2, 22, 36);
-      const faces = top.map((c, i) => ({ c, i, rad: i === 0 ? r1 : r1 * 0.78 * Math.sqrt(c.votes / top[0].votes) }))
-        .filter((f) => f.i === 0 || f.c.votes / top[0].votes >= FACE_MIN_RATIO);
-      const pos = [[0, 0], [r1 * 0.95, r1 * 0.2], [-r1 * 0.95, r1 * 0.2]];
-      for (const f of faces.slice().reverse()) { // draw back to front
-        const x = g.lx + pos[f.i][0], y = g.ly + pos[f.i][1];
-        const ring = mode === 'mayor' ? (candColour(f.c.name) || css('--other')) : (f.i === 0 ? css('--ink') : css('--surface'));
-        const ph = photoOf(r.pkey, f.c.name);
+      const r = on ? (mode === 'mayor' ? model.wards[num]?.mayor : model.wards[num]?.council) : null;
+      const [a, b] = r?.leader && !r.tied ? r.cands : [];
+      const pa = a && photoOf(r.pkey, a.name);
+      if (!pa) { lbl.setAttribute('y', g.ly); lbl.classList.remove('small'); continue; }
+      const r1 = clamp(wardSize[num] * 0.15, 16, 28);
+      const faces = [{ c: a, ph: pa, rad: r1, x: g.lx, y: g.ly, lead: true }];
+      const pb = b && b.votes >= a.votes * FACE_CLOSE && photoOf(r.pkey, b.name);
+      if (pb) faces.unshift({ c: b, ph: pb, rad: r1 * 0.72, x: g.lx + r1 * 0.95, y: g.ly - r1 * 0.35 });
+      for (const f of faces) {
+        const ring = mode === 'mayor' ? (candColour(f.c.name) || css('--other')) : css(f.lead ? '--ink' : '--surface');
         const id = `fc${clipId++}`;
-        parts.push(`<g class="face${f.i === 0 ? ' lead' : ''}"><title>${esc(f.c.name)} ${pct(f.c.pct)}</title>
-          <circle cx="${x}" cy="${y}" r="${f.rad + 2.5}" fill="${ring}"/>
-          ${ph ? `<clipPath id="${id}"><circle cx="${x}" cy="${y}" r="${f.rad}"/></clipPath>
-            <image href="photos/${ph.f}" x="${x - f.rad}" y="${y - f.rad}" width="${f.rad * 2}" height="${f.rad * 2}" clip-path="url(#${id})" preserveAspectRatio="xMidYMid slice"/>`
-            : `<circle cx="${x}" cy="${y}" r="${f.rad}" class="face-i"/><text x="${x}" y="${y}" class="face-t" style="font-size:${f.rad * 0.58}px">${esc(initials(f.c.name))}</text>`}
-        </g>`);
+        parts.push(`<g class="face"><title>${esc(f.c.name)} ${pct(f.c.pct)}</title>
+          <circle cx="${f.x}" cy="${f.y}" r="${f.rad + 2.5}" fill="${ring}"/>
+          <clipPath id="${id}"><circle cx="${f.x}" cy="${f.y}" r="${f.rad}"/></clipPath>
+          <image href="photos/${f.ph.f}" x="${f.x - f.rad}" y="${f.y - f.rad}" width="${f.rad * 2}" height="${f.rad * 2}" clip-path="url(#${id})" preserveAspectRatio="xMidYMid slice"/></g>`);
       }
       lbl.setAttribute('y', g.ly + r1 + 11); lbl.classList.add('small');
     }
@@ -550,8 +550,17 @@
       note = 'Darker = higher turnout';
     }
     $('#legend').innerHTML = `<div class="lg-row">${key}</div>
-      <div class="lg-row lg-note">${sw(css('--nodata'), 'No votes yet')}<span>${note}</span><span>Hover to preview · click to pin</span></div>`;
+      <div class="lg-row lg-note">${sw(css('--nodata'), 'No votes yet')}<span>${note}</span>
+        <label class="lg-toggle"${mode === 'mayor' || mode === 'council' ? '' : ' hidden'}><input type="checkbox" id="facesToggle"${showFaces ? ' checked' : ''}> Faces</label>
+        <span>Hover to preview · click to pin</span></div>`;
   }
+
+  $('#legend').addEventListener('change', (e) => {
+    if (e.target.id !== 'facesToggle') return;
+    showFaces = e.target.checked;
+    try { localStorage.setItem('faces', showFaces ? 'on' : 'off'); } catch {}
+    renderFaces();
+  });
 
   // ---------- hover / pin ----------
   function setHover(n) {
