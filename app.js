@@ -1050,9 +1050,10 @@
   function locate({ quiet = false } = {}) {
     if (!navigator.geolocation) { if (!quiet) wardMsg("This browser can't share its location. Pick your ward from the list instead."); return; }
     const btn = $('#wardLocate');
-    if (!quiet) { btn.disabled = true; btn.textContent = 'Finding you…'; wardMsg(''); }
+    const label = btn.querySelector('span');
+    if (!quiet) { btn.disabled = true; label.textContent = 'Finding your ward…'; wardMsg(''); }
     navigator.geolocation.getCurrentPosition((pos) => {
-      btn.disabled = false; btn.textContent = 'Use my location';
+      btn.disabled = false; label.textContent = 'Use my current location';
       const { num, pt } = wardAt(pos.coords.latitude, pos.coords.longitude);
       if (num) {
         useWard(num, pt, { jump: !quiet || !userPinned });
@@ -1061,7 +1062,7 @@
         wardMsg("You don't seem to be in the City of Toronto right now. Pick a ward from the list instead.");
       }
     }, (err) => {
-      btn.disabled = false; btn.textContent = 'Use my location';
+      btn.disabled = false; label.textContent = 'Use my current location';
       if (quiet) return;
       wardMsg(err.code === err.PERMISSION_DENIED ? 'Location access is turned off for this site. You can pick your ward from the list instead.'
         : "Couldn't get your location just now. Try again, or pick your ward from the list.");
@@ -1073,9 +1074,13 @@
     wardMsg('');
     $('#wardGo').hidden = !myWard;
     if (myWard) $('#wardGo').textContent = `Go to Ward ${myWard}`;
-    $('#wardPick').innerHTML = '<option value="">Choose a ward…</option>' + Object.entries(geo.wards)
+    const hero = $('#wardHeroMap');
+    hero.setAttribute('viewBox', `0 0 ${geo.w} ${geo.h}`);
+    hero.innerHTML = Object.entries(geo.wards).map(([n, w]) => `<path d="${w.d}"${n === myWard ? ' class="mine"' : ''}/>`).join('');
+    $('#wardPick').innerHTML = '<option value="">Select a ward…</option>' + Object.entries(geo.wards)
       .sort((a, b) => a[0] - b[0]).map(([n, w]) => `<option value="${n}"${n === myWard ? ' selected' : ''}>Ward ${n} - ${esc(w.name)}</option>`).join('');
     dlg.showModal();
+    $('#wardLocate').focus({ focusVisible: false });
   }
   // 30 seconds in: if location is already allowed, quietly use it; if we've never asked, offer it once per visit.
   async function maybeAskWard() {

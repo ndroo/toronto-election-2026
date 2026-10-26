@@ -340,16 +340,36 @@ svg#map .me { pointer-events: none; }
 svg#map .me-dot { fill: var(--proj); stroke: #fff; stroke-width: 2.5; }
 svg#map .me-halo { fill: var(--proj); opacity: .25; transform-box: fill-box; transform-origin: center; animation: me-pulse 2.4s ease-out infinite; }
 @keyframes me-pulse { from { transform: scale(.6); opacity: .45; } to { transform: scale(2.2); opacity: 0; } }
-#wardDlg { border: 1px solid var(--border); border-radius: 14px; padding: 0; width: min(440px, calc(100vw - 32px)); background: var(--surface); color: var(--ink); box-shadow: 0 24px 64px rgba(0,0,0,.3); }
-#wardDlg::backdrop { background: rgba(0,0,0,.3); backdrop-filter: blur(2px); }
-#wardDlg form { padding: 22px 24px 18px; }
-#wardDlg h2 { margin: 6px 0 8px; font-size: 19px; }
-#wardDlg p { margin: 0 0 10px; color: var(--ink-2); line-height: 1.5; font-size: 14px; }
-.wd-icon { width: 42px; height: 42px; border-radius: 50%; display: grid; place-items: center; background: color-mix(in srgb, var(--proj) 14%, transparent); color: var(--proj); }
-.wd-privacy { font-size: 12.5px !important; background: var(--surface-2); border-radius: 8px; padding: 9px 11px; }
-.wd-msg { color: var(--critical) !important; font-size: 13px !important; }
-.wd-alt { display: flex; align-items: center; gap: 8px; margin-top: 14px; font-size: 12.5px; color: var(--muted); }
-.wd-alt select { flex: 1; min-width: 0; font: inherit; color: var(--ink); background: var(--surface); border: 1px solid var(--axis); border-radius: 6px; padding: 5px 6px; }
+#wardDlg { border: 0; border-radius: 18px; padding: 0; width: min(400px, calc(100vw - 32px)); background: var(--surface); color: var(--ink); box-shadow: 0 30px 80px rgba(0,0,0,.28), 0 0 0 1px var(--border); overflow: hidden; }
+#wardDlg::backdrop { background: rgba(10,20,40,.38); backdrop-filter: blur(3px); }
+#wardDlg form { padding: 0; }
+.wd-hero { position: relative; height: 138px; background: linear-gradient(180deg, color-mix(in srgb, var(--proj) 12%, var(--surface)) 0%, var(--surface) 100%); display: grid; place-items: center; overflow: hidden; }
+.wd-hero > svg { width: 78%; height: auto; transform: rotate(-4deg) translateY(14px); -webkit-mask-image: linear-gradient(180deg, #000 45%, transparent 92%); mask-image: linear-gradient(180deg, #000 45%, transparent 92%); }
+.wd-hero path { fill: color-mix(in srgb, var(--proj) 22%, var(--surface)); stroke: var(--surface); stroke-width: 3; }
+.wd-hero path.mine { fill: var(--proj); }
+.wd-pin { position: absolute; left: 50%; top: 24px; transform: translateX(-50%); filter: drop-shadow(0 6px 8px rgba(0,0,0,.25)); animation: pin-drop .9s cubic-bezier(.3,1.5,.5,1) .25s both; }
+@keyframes pin-drop { from { transform: translate(-50%, -40px); opacity: 0; } }
+.wd-body { padding: 18px 26px 16px; text-align: center; }
+#wardDlg h2 { margin: 0 0 6px; font-size: 21px; letter-spacing: -0.015em; }
+.wd-lede { margin: 0 auto 18px !important; color: var(--ink-2); font-size: 14px; line-height: 1.5; max-width: 32ch; }
+.wd-primary { width: 100%; display: inline-flex; align-items: center; justify-content: center; gap: 9px; height: 46px; border: 0; border-radius: 11px; background: var(--proj); color: #fff; font: 650 15px/1 system-ui, -apple-system, "Segoe UI", sans-serif; cursor: pointer; box-shadow: 0 6px 16px color-mix(in srgb, var(--proj) 35%, transparent); transition: transform .15s, box-shadow .15s, filter .15s; }
+.wd-primary:hover { transform: translateY(-1px); filter: brightness(1.08); box-shadow: 0 9px 20px color-mix(in srgb, var(--proj) 40%, transparent); }
+.wd-primary:disabled { opacity: .7; cursor: progress; transform: none; }
+.wd-secondary { width: 100%; height: 40px; margin-top: 8px; border-radius: 11px; border: 1px solid var(--axis); background: var(--surface); color: var(--ink); font: 600 14px/1 system-ui, -apple-system, "Segoe UI", sans-serif; cursor: pointer; }
+.wd-secondary:hover { background: var(--surface-2); }
+.wd-privacy { display: flex; align-items: center; justify-content: center; gap: 6px; margin: 10px 0 0 !important; font-size: 12px; color: var(--muted); }
+.wd-msg { margin: 10px 0 0 !important; font-size: 13px; color: var(--critical); line-height: 1.4; }
+.wd-or { display: flex; align-items: center; gap: 10px; margin: 18px 0 10px; color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .07em; font-weight: 600; }
+.wd-or::before, .wd-or::after { content: ""; flex: 1; height: 1px; background: var(--grid); }
+.wd-select { position: relative; }
+.wd-select::after { content: ""; position: absolute; right: 14px; top: 50%; width: 7px; height: 7px; border-right: 2px solid var(--muted); border-bottom: 2px solid var(--muted); transform: translateY(-70%) rotate(45deg); pointer-events: none; }
+.wd-select select { appearance: none; -webkit-appearance: none; width: 100%; height: 42px; padding: 0 36px 0 14px; border-radius: 11px; border: 1px solid var(--axis); background: var(--surface); color: var(--ink); font: 500 14px/1 system-ui, -apple-system, "Segoe UI", sans-serif; cursor: pointer; }
+.wd-select select:hover { border-color: var(--muted); }
+.wd-select select:focus-visible, .wd-skip:focus-visible { outline: 2px solid var(--proj); outline-offset: 2px; }
+.wd-primary:focus { outline: none; }
+.wd-primary:focus-visible { box-shadow: 0 6px 16px color-mix(in srgb, var(--proj) 35%, transparent), 0 0 0 3px var(--surface), 0 0 0 5px color-mix(in srgb, var(--proj) 45%, transparent); }
+.wd-skip { margin-top: 12px; border: 0; background: none; color: var(--muted); font: 600 13px/1 system-ui, -apple-system, "Segoe UI", sans-serif; cursor: pointer; padding: 6px 10px; border-radius: 6px; }
+.wd-skip:hover { color: var(--ink); }
 .fade-dlg[open] { animation: dlg-in .55s cubic-bezier(.2,.8,.2,1) both; }
 .fade-dlg[open]::backdrop { animation: bd-in .55s ease both; }
 @keyframes dlg-in { from { opacity: 0; transform: translateY(10px) scale(.98); } }
@@ -490,22 +510,30 @@ svg#map .me-halo { fill: var(--proj); opacity: .25; transform-box: fill-box; tra
 
 <dialog id="wardDlg" class="fade-dlg" aria-labelledby="wardDlgTitle">
   <form method="dialog">
-    <div class="wd-icon" aria-hidden="true"><svg viewBox="0 0 16 16" width="22" height="22"><path d="M8 1.5a4.5 4.5 0 0 0-4.5 4.5c0 3.3 4.5 8.5 4.5 8.5s4.5-5.2 4.5-8.5A4.5 4.5 0 0 0 8 1.5Zm0 6.2a1.7 1.7 0 1 1 0-3.4 1.7 1.7 0 0 1 0 3.4Z" fill="currentColor"/></svg></div>
-    <h2 id="wardDlgTitle">See your ward's results</h2>
-    <p>Jump straight to the council race where you are, and how your ward is voting for mayor.</p>
-    <p class="wd-privacy"><b>Private by design.</b> Your location is matched to the ward map right here in your browser. It's never sent anywhere, and only your ward number is remembered on this device.</p>
-    <p id="wardMsg" class="wd-msg" role="status" hidden></p>
-    <div class="welcome-actions">
-      <button class="btn" value="cancel">Not now</button>
-      <button id="wardGo" class="btn" type="button" hidden>Go to my ward</button>
-      <button id="wardLocate" class="btn primary" type="button" autofocus>Use my location</button>
+    <div class="wd-hero" aria-hidden="true">
+      <svg id="wardHeroMap"></svg>
+      <div class="wd-pin"><svg viewBox="0 0 24 32" width="30" height="40"><path d="M12 1C5.9 1 1 5.9 1 12c0 8.3 11 19 11 19s11-10.7 11-19C23 5.9 18.1 1 12 1Z" fill="var(--proj)" stroke="#fff" stroke-width="2"/><circle cx="12" cy="12" r="4.2" fill="#fff"/></svg></div>
     </div>
-    <label class="wd-alt">Or choose it yourself <select id="wardPick"></select></label>
+    <div class="wd-body">
+      <h2 id="wardDlgTitle">See your ward's results</h2>
+      <p class="wd-lede">Jump straight to the council race where you are, and see how your ward is voting for mayor.</p>
+      <button id="wardLocate" class="wd-primary" type="button">
+        <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><circle cx="12" cy="12" r="3.5" fill="currentColor"/><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 1v3M12 20v3M1 12h3M20 12h3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        <span>Use my current location</span>
+      </button>
+      <button id="wardGo" class="wd-secondary" type="button" hidden>Go to my ward</button>
+      <p class="wd-privacy"><svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><path d="M4.5 7V5a3.5 3.5 0 0 1 7 0v2" fill="none" stroke="currentColor" stroke-width="1.6"/><rect x="3" y="7" width="10" height="7.5" rx="1.6" fill="currentColor"/></svg>
+        Matched on your device. Never sent or stored.</p>
+      <p id="wardMsg" class="wd-msg" role="status" hidden></p>
+      <div class="wd-or"><span>or pick your ward</span></div>
+      <div class="wd-select"><select id="wardPick" aria-label="Choose your ward"></select></div>
+      <button class="wd-skip" value="cancel">Not now</button>
+    </div>
   </form>
 </dialog>
 
 <div id="tip" role="tooltip"></div>
 <div id="callTip" role="tooltip"></div>
-<script src="app.js?v=20261026k"></script>
+<script src="app.js?v=20261026m"></script>
 </body>
 </html>
