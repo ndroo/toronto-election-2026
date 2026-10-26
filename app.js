@@ -19,6 +19,7 @@
   const SOURCES = params.get('src')
     ? [{ id: 'custom', url: params.get('src') }]
     : [
+        { id: 'worker', base: params.get('worker') || 'https://toronto-election-2026.andrewjohnmcgrath.workers.dev' },
         { id: 'api', url: `https://api.github.com/repos/${OWNER}/${REPO}/contents/bundle.json?ref=data`,
           headers: { Accept: 'application/vnd.github.raw+json' } },
         { id: 'raw', url: `https://raw.githubusercontent.com/${OWNER}/${REPO}/data/bundle.json` },
@@ -32,8 +33,10 @@
   const fmt = (n) => n.toLocaleString('en-CA');
   const pct = (n, d = 1) => `${n.toFixed(d)}%`;
   const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  const time = (d) => d.toLocaleTimeString('en-CA', { timeZone: TZ, hour: 'numeric', minute: '2-digit', second: '2-digit' });
-  const ago = (ms) => { const s = Math.max(0, Math.round(ms / 1000)); return s < 60 ? `${s}s ago` : s < 3600 ? `${Math.floor(s / 60)}m ${s % 60}s ago` : `${Math.floor(s / 3600)}h ${Math.floor((s % 3600) / 60)}m ago`; };
+  const time = (d) => Date.now() - d > 12 * 3600e3
+    ? d.toLocaleString('en-CA', { timeZone: TZ, month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
+    : d.toLocaleTimeString('en-CA', { timeZone: TZ, hour: 'numeric', minute: '2-digit', second: '2-digit' });
+  const ago = (ms) => { const s = Math.max(0, Math.round(ms / 1000)); if (s >= 86400) return `${Math.floor(s / 86400)} days ago`; return s < 60 ? `${s}s ago` : s < 3600 ? `${Math.floor(s / 60)}m ${s % 60}s ago` : `${Math.floor(s / 3600)}h ${Math.floor((s % 3600) / 60)}m ago`; };
   const css = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
   const hexRgb = (h) => { h = h.replace('#', ''); return [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16)); };
   const mix = (a, b, t) => { const A = hexRgb(a), B = hexRgb(b); return `rgb(${A.map((v, i) => Math.round(v * t + B[i] * (1 - t))).join(',')})`; };
@@ -144,6 +147,17 @@
     for (const src of SOURCES) {
       if (src.id === 'api' && Date.now() < apiBlockedUntil) continue;
       try {
+        if (src.base) {
+          // Cloudflare Worker: CORS pass-through of the two City files, fetched in parallel.
+          const get = async (f) => {
+            const r = await fetch(`${src.base}/${f}`, { cache: 'no-cache' });
+            if (!r.ok) throw new Error(`${src.id}: HTTP ${r.status}`);
+            return { json: await r.json(), at: r.headers.get('X-Fetched-At') };
+          };
+          const [a, w] = await Promise.all([get('unofficialresult.json'), get('unofficialresult-wardbyward.json')]);
+          usedSource = src.id;
+          return { all: a.json, wardbyward: w.json, relayedAt: [a.at, w.at].filter(Boolean).sort()[0] || null };
+        }
         const r = await fetch(src.url, { cache: 'no-cache', headers: src.headers || {} });
         if (src.id === 'api' && (r.status === 403 || r.status === 429)) {
           const reset = int(r.headers.get('x-ratelimit-reset')) * 1000;

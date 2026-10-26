@@ -255,7 +255,7 @@ footer a { color: var(--ink-2); }
   Source: City of Toronto unofficial results feeds
   (<a href="https://mediaresults.toronto.ca/results/unofficialresult.json">all offices</a>,
   <a href="https://mediaresults.toronto.ca/results/unofficialresult-wardbyward.json">mayor by ward</a>),
-  relayed every ~45 seconds because the City's feed does not allow cross-origin browser requests.
+  passed through a Cloudflare Worker (cached up to 15 seconds) because the City's feed does not allow cross-origin browser requests, with a GitHub Actions copy as backup.
   Results are unofficial until certified by the City Clerk. Advance-vote results are folded into ward totals on election night.
   Ward boundaries: <a href="https://open.toronto.ca/dataset/city-wards/">Toronto Open Data</a>.
   <span id="srcInfo"></span>

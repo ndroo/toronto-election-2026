@@ -18,3 +18,7 @@ The relay runs on a cron for Oct 26-28. To kick it manually: `gh workflow run re
 - `?src=<url>` - read a bundle from another URL (local testing)
 
 Ward boundaries: Toronto Open Data, City Wards (25-ward model), simplified.
+
+## Cloudflare Worker (primary data path)
+
+`worker/` is a Cloudflare Worker that passes the two City files through with a CORS header for the GitHub Pages origin (and localhost:8765), caching each for 15 s and serving the last good copy if the City is briefly unreachable. Deploy with `cd worker && npx wrangler@4 deploy` (Node 22+). The page uses it first and falls back to the GitHub Actions copy if it fails. Override with `?worker=<base url>`.
