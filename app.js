@@ -57,6 +57,8 @@
   const hexRgb = (h) => { h = h.replace('#', ''); return [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16)); };
   const mix = (a, b, t) => { const A = hexRgb(a), B = hexRgb(b); return `rgb(${A.map((v, i) => Math.round(v * t + B[i] * (1 - t))).join(',')})`; };
   const clamp = (x, lo = 0, hi = 1) => Math.min(hi, Math.max(lo, x));
+  // Turnout = ballots counted ÷ electors on the list.
+  const turnout = (r) => (r?.totalVoters ? (r.ballots ?? r.votes) / r.totalVoters : 0);
 
   // ---------- state ----------
   let geo = null;
@@ -149,7 +151,10 @@
     for (const [n, { w, cands }] of Object.entries(byWard)) {
       const ward = (m.wards[n] ||= { num: int(n), name: w.name });
       ward.name ||= w.name;
-      ward.mayor = race(`mayor|${n}`, { ...w, votesReceived: w.votesCounted }, cands, int(w.votesCounted));
+      // Shares are of the candidates' votes added up; `votesCounted` (ballots counted, which can include
+      // rejected or declined ballots) is kept separately for turnout.
+      ward.mayor = race(`mayor|${n}`, { ...w, votesReceived: null, votesCounted: null }, cands);
+      ward.mayor.ballots = int(w.votesCounted) || ward.mayor.votes;
     }
     for (const o of offices) {
       if (o === mayorOffice || o === councilOffice) continue;
@@ -164,6 +169,9 @@
     for (const w of Object.values(m.wards)) { if (w.mayor) w.mayor.pkey = 'mayor'; if (w.council) w.council.pkey = `council-${w.num}`; }
     for (const b of m.boards) for (const w of b.wards) w.race.pkey = `o${b.id}-${w.num}`;
     prevVotes = nextVotes;
+    // City-wide ballots counted: the City-wide file only has candidates' votes, so add up the wards.
+    const wardBallots = Object.values(m.wards).reduce((a, w) => a + (w.mayor?.ballots || 0), 0);
+    m.mayor.ballots = Math.max(wardBallots, m.mayor.votes);
     // Calls. City-wide mayor estimates the votes still to come ward by ward.
     const perPoll = m.mayor.pollsReceived ? m.mayor.votes / m.mayor.pollsReceived : 0;
     const mayorLeft = Object.values(m.wards).reduce((sum, w) => {
@@ -187,7 +195,7 @@
     if (r.tied) return { status: 'tied', reason: `Tied at ${fmt(a.votes)} votes each` };
     if (r.complete) return { status: 'decided', reason: `All ${fmt(r.polls)} polls reported - unofficial until certified` };
     const gap = a.votes - b.votes;
-    const maxLeft = Math.max(0, r.totalVoters - r.votes);
+    const maxLeft = Math.max(0, r.totalVoters - (r.ballots ?? r.votes));
     if (gap > maxLeft) return { status: 'decided', reason: `Lead of ${fmt(gap)} is bigger than all ${fmt(maxLeft)} electors not yet counted` };
     const left = Math.min(maxLeft, (estLeft ?? (r.votes / r.pollsReceived) * (r.polls - r.pollsReceived)) * CALL.safety);
     const topTwo = r.votes ? left * ((a.votes + b.votes) / r.votes) : 0;
@@ -270,9 +278,9 @@
       <section id="m-calc"><h3>How each number is worked out</h3>
       <dl class="calls defs">
         <dt>Votes</dt><dd>As reported by the feed, unchanged.</dd>
-        <dt>Percent</dt><dd>The feed's own percentage for city-wide and ward races. For mayor results within a ward (which the feed gives without percentages), votes ÷ total mayor votes counted in that ward.</dd>
+        <dt>Percent</dt><dd>The feed's own percentage for city-wide and ward races. For mayor results within a ward (which the feed gives without percentages), the candidate's votes ÷ all mayoral candidates' votes in that ward, so the shares add up to 100%.</dd>
         <dt>Polls reporting</dt><dd>Voting subdivisions received ÷ total subdivisions, from the feed. Advance-vote subdivisions are included.</dd>
-        <dt>Turnout</dt><dd>Ballots counted for the office ÷ eligible electors on the list, both from the feed. It rises as polls report and is only final when all polls are in.</dd>
+        <dt>Turnout</dt><dd>Ballots counted ÷ electors on the list, both from the feed. Ballots counted can be a little higher than the candidates' votes added up, because it can include rejected or declined ballots. The city-wide figure adds up the 25 wards. It rises as polls report and is only final when all polls are in.</dd>
         <dt>Lead</dt><dd>Leader's percent minus second place's percent, in percentage points.</dd>
         <dt>+ green numbers</dt><dd>Votes added since the previous update you saw.</dd>
       </dl>
@@ -446,7 +454,7 @@
       fill(ww, cands, `m|${w.num}`, p);
       for (const c of mo.candidate) {
         const cw = c.ward.find((x) => x.num === w.num);
-        cw.pollsReceived = ww.pollsReceived; cw.votesCounted = ww.votesReceived;
+        cw.pollsReceived = ww.pollsReceived; cw.votesCounted = String(Math.round(int(ww.votesReceived) * 1.008)); // a few rejected/declined ballots
         cw.votesReceived = cands.find((x) => x.name === c.name).votesReceived;
       }
     }
@@ -559,7 +567,7 @@
     }
     if (mode === 'turnout') {
       const r = w.mayor;
-      return r?.totalVoters && r.votes ? seqColour(r.votes / r.totalVoters / 0.6) : nodata;
+      return r?.totalVoters && r.votes ? seqColour(turnout(r) / 0.6) : nodata;
     }
   }
 
@@ -687,7 +695,7 @@
     const w = model.wards[hover] || { name: geo.wards[hover].name };
     const rep = w.mayor || w.council;
     tip.innerHTML = `<h3>Ward ${hover} - ${esc(w.name)}</h3>
-      <div style="color:var(--ink-2)">${rep ? `${fmt(rep.pollsReceived)}/${fmt(rep.polls)} polls reporting${rep.totalVoters ? ` - turnout ${pct((rep.votes / rep.totalVoters) * 100)}` : ''}` : ''}</div>
+      <div style="color:var(--ink-2)">${rep ? `${fmt(rep.pollsReceived)}/${fmt(rep.polls)} polls reporting${rep.totalVoters ? ` - turnout ${pct(turnout(rep) * 100)}` : ''}` : ''}</div>
       <div class="sec"><span>Councillor</span><span>${w.council ? `${w.council.cands.length} candidates` : ''}</span></div>${tipRows(w.council, 4)}
       <div class="sec"><span>Mayor in this ward</span><span>${w.mayor ? `${w.mayor.cands.length} candidates` : ''}</span></div>${tipRows(w.mayor, 4, true)}`;
     tip.classList.add('on');
@@ -764,8 +772,8 @@
           ${String(n) === myWard ? '<span class="you-tag">Your ward</span>' : ''}
           ${hover && hover !== pinned ? '<span class="pinned">Previewing · click to pin</span>' : ''}</div>
         <div class="ward-sub">${rep ? `<span class="ws"><span class="wt wt-polls">${fmt(rep.pollsReceived)}/${fmt(rep.polls)} polls · ${pct(rep.polls ? (rep.pollsReceived / rep.polls) * 100 : 0, 0)}</span>${meter(rep.polls ? rep.pollsReceived / rep.polls : 0, rep.complete)}</span>
-          <span class="ws"><span class="wt wt-turn">Turnout ${pct(rep.totalVoters ? (rep.votes / rep.totalVoters) * 100 : 0)}</span>${meter(rep.totalVoters ? rep.votes / rep.totalVoters : 0)}</span>
-          <span>${fmt(rep.totalVoters)} electors</span>` : ''}</div>
+          <span class="ws"><span class="wt wt-turn">Turnout ${pct(turnout(rep) * 100)}</span>${meter(turnout(rep))}</span>
+          <span title="Ballots counted so far, of the electors on the list">${rep.votes ? `${fmt(rep.ballots ?? rep.votes)} of ` : ''}${fmt(rep.totalVoters)} electors${rep.votes ? ' voted' : ''}</span>` : ''}</div>
       </div>
       <div class="races">
         <div class="race"><div class="race-head"><h3>Council · Ward ${n}${openSeat(w.council) ? ` <span class="open-seat" title="${esc(openSeat(w.council))} is not running again here">Open seat</span>` : ''}</h3><span class="meta">${raceMeta(w.council)}</span></div>
@@ -792,11 +800,20 @@
       <div class="call-why">The mayor's race is called on the city-wide count (left), not ward by ward.</div>`;
   }
 
+  // How many of the 25 wards each of the top two mayoral candidates is leading.
+  function wardsLeading(r) {
+    const [a, b] = r.leader ? r.cands : [];
+    if (!a || !b) return '';
+    const wards = Object.values(model.wards);
+    const n = (c) => wards.filter((w) => w.mayor?.leader && !w.mayor.tied && w.mayor.leader.name === c.name).length;
+    return `<div class="wards-leading">Wards leading: ${[a, b].map((c) => `<span class="wl"><i style="background:${candColour(c.name) || css('--other')}"></i>${esc(c.name)} <b>${n(c)}</b></span>`).join('')}<span class="wl-of">of ${wards.length}</span></div>`;
+  }
+
   // City-wide mayor: every candidate as a card, in rank order; the top five are what's in view.
   function renderCity() {
     const r = model.mayor;
     $('#cityMeta').textContent = raceMeta(r);
-    $('#cityCall').innerHTML = callRow(r, { reason: false }); // the reason is in the badge's hover card; space is tight here
+    $('#cityCall').innerHTML = callRow(r, { reason: false }) + wardsLeading(r); // the reason is in the badge's hover card; space is tight here
     const st = r.call?.status;
     const max = Math.max(1, ...r.cands.map((c) => c.pct));
     const counting = r.votes > 0; // before the first results the order is just A-Z, so no ranks or zeros
@@ -848,7 +865,7 @@
       ['Council called', `${called}/${wards.length}`, meter(wards.length ? called / wards.length : 0, called === wards.length)],
       [`Polls reporting · ${pct(r.polls ? (r.pollsReceived / r.polls) * 100 : 0, 0)}`, `${fmt(r.pollsReceived)}/${fmt(r.polls)}`, meter(r.polls ? r.pollsReceived / r.polls : 0, r.complete)],
       ['Wards complete', `${wardsDone}/${wards.length}`, meter(wards.length ? wardsDone / wards.length : 0, wards.length > 0 && wardsDone === wards.length)],
-      [`Turnout · ${compact(r.votes)} of ${compact(r.totalVoters)}`, pct(r.totalVoters ? (r.votes / r.totalVoters) * 100 : 0), meter(r.totalVoters ? r.votes / r.totalVoters : 0)],
+      [`Turnout · ${compact(r.ballots ?? r.votes)} of ${compact(r.totalVoters)}`, pct(turnout(r) * 100), meter(turnout(r))],
     ];
     $('#stats').innerHTML = s.map(([k, v, m], i) => `<div class="stat"><b data-ok="s|${i}">${v}</b>${m}<span>${k}</span></div>`).join('');
   }
@@ -880,12 +897,16 @@
       $('#srcInfo').textContent = ` Feed seq ${model.seq}${model.relayedAt ? `, relay checked ${time(model.relayedAt)}` : ''}${model.changedAt ? `, last change ${time(model.changedAt)}` : ''}.`;
     }
     notice.hidden = !note; notice.innerHTML = note;
+    const fresh = [];
+    if (lastOk) fresh.push(`Checked ${ago(Date.now() - lastOk)}`);
+    if (model?.generatedAt && model.mayor.pollsReceived > 0) fresh.push(`City updated ${model.generatedAt.toLocaleTimeString('en-CA', { timeZone: TZ, hour: 'numeric', minute: '2-digit', second: '2-digit' })}`);
+    $('#fresh').textContent = fresh.join(' · ');
   }
 
   const COLS = [
     { key: 'num', label: 'Ward', v: (w) => w.num },
     { key: 'rep', label: 'Reporting', v: (w) => { const r = w.mayor || w.council; return r?.polls ? r.pollsReceived / r.polls : 0; } },
-    { key: 'turn', label: 'Turnout', v: (w) => (w.mayor?.totalVoters ? w.mayor.votes / w.mayor.totalVoters : 0) },
+    { key: 'turn', label: 'Turnout', v: (w) => turnout(w.mayor) },
     { key: 'mmar', label: 'Mayor leader here', v: (w) => w.mayor?.margin || 0 },
     { key: 'cmar', label: 'Council leader', v: (w) => w.council?.margin || 0 },
   ];
@@ -1053,6 +1074,24 @@
         tx.dataset.id = latest.id; tx.textContent = latest.headline;
         tx.classList.remove('in'); void tx.offsetWidth; tx.classList.add('in');
         $('#tkTime').textContent = feedTime(latest.t);
+        $('#tkBody').textContent = (latest.body.match(/^.*?[.?](\s|$)/)?.[0] || latest.body).trim();
+      }
+      // Earlier posts drift past on the right. Rebuilt only when the posts change, so the scroll doesn't restart.
+      const earlier = posts.slice(1, 9);
+      const sig = earlier.map((p) => p.id).join();
+      const more = $('#tkMore');
+      if (more.dataset.sig !== sig) {
+        more.dataset.sig = sig;
+        const items = earlier.map((p) => `<button type="button" class="tk-item" data-post="${p.id}"><time>${feedTime(p.t)}</time>${esc(p.headline)}</button>`).join('');
+        more.innerHTML = items ? `<div class="tk-track">${items}${items}</div>` : '';
+        const track = more.firstElementChild;
+        if (track) requestAnimationFrame(() => {
+          const half = track.scrollWidth / 2;
+          const moving = half > more.clientWidth;
+          if (!moving) track.innerHTML = items; // fits already: show once, no motion
+          track.classList.toggle('go', moving);
+          track.style.setProperty('--dur', `${Math.round(half / 40)}s`); // about 40px a second
+        });
       }
     }
     if (tab === 'feed' && latest) { feedSeen = Math.max(feedSeen, latest.id); store.set('feedSeen', String(feedSeen)); }
@@ -1086,7 +1125,13 @@
   const setTicker = (on) => { tickerOn = on; store.set('ticker', on ? 'on' : 'off'); renderFeed(); };
   $('#tickerOff').addEventListener('click', () => setTicker(false));
   $('#tickerToggle').addEventListener('change', (e) => setTicker(e.target.checked));
-  $('#tickerBtn').addEventListener('click', () => { setTab('feed'); renderFeed(); $('#right').scrollIntoView({ behavior: 'smooth', block: 'start' }); });
+  const openPost = (id) => {
+    setTab('feed'); renderFeed();
+    const el = id && document.querySelector(`.post[data-id="${id}"]`);
+    (el || $('#right')).scrollIntoView({ behavior: 'smooth', block: el ? 'center' : 'start' });
+  };
+  $('#tickerBtn').addEventListener('click', () => openPost(posts[0]?.id));
+  $('#tkMore').addEventListener('click', (e) => { const b = e.target.closest('[data-post]'); if (b) openPost(b.dataset.post); });
 
   $('#raceSwitch').addEventListener('click', (e) => {
     const btn = e.target.closest('button'); if (!btn) return;

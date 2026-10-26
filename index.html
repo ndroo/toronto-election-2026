@@ -566,8 +566,8 @@ svg#map .me-halo { fill: var(--proj); opacity: .25; transform-box: fill-box; tra
 /* Live feed: ticker under the header, and the Live tab */
 .ticker { flex: none; display: flex; align-items: center; gap: 10px; padding: 6px 16px; border-bottom: 1px solid var(--border); background: var(--surface); font-size: 13px; min-width: 0; }
 .ticker[hidden] { display: none; }
-.tk-live { flex: none; font-size: 10.5px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: #fff; background: var(--critical); border-radius: 4px; padding: 2px 6px; }
-#tickerBtn { flex: 1; min-width: 0; display: flex; gap: 8px; align-items: baseline; border: 0; background: none; padding: 0; cursor: pointer; text-align: left; color: var(--ink); }
+.tk-live { flex: none; display: inline-flex; align-items: center; gap: 5px; font-size: 10.5px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: #fff; background: var(--critical); border-radius: 4px; padding: 2px 6px; }
+#tickerBtn { flex: 0 1 auto; max-width: 60%; min-width: 0; display: flex; gap: 8px; align-items: baseline; border: 0; background: none; padding: 0; cursor: pointer; text-align: left; color: var(--ink); }
 #tickerBtn time { flex: none; color: var(--muted); font-variant-numeric: tabular-nums; font-size: 12px; }
 #tkText { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
 #tkText.in { animation: tk-in .5s ease-out; }
@@ -619,6 +619,36 @@ svg#map .me-halo { fill: var(--proj); opacity: .25; transform-box: fill-box; tra
 .toast { position: fixed; left: 50%; bottom: 24px; transform: translate(-50%, 12px); z-index: 70; background: var(--ink); color: var(--surface); font-size: 13px; font-weight: 600; padding: 8px 14px; border-radius: 999px; box-shadow: 0 6px 20px rgba(0,0,0,.2); opacity: 0; pointer-events: none; transition: opacity .2s, transform .2s; }
 .toast.on { opacity: 1; transform: translate(-50%, 0); }
 body.watching .toast { bottom: 120px; }
+
+/* "Checked 5s ago · City updated 9:14:02 p.m.": our check vs the City's own file time, so a pause is easy to place. */
+.status-wrap { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; }
+.fresh { padding-left: 10px; font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.fresh:empty { display: none; }
+.wards-leading { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; font-size: 12px; color: var(--muted); margin: 2px 0 8px; }
+.wards-leading .wl { display: inline-flex; align-items: center; gap: 5px; color: var(--ink-2); }
+.wards-leading .wl b { color: var(--ink); font-variant-numeric: tabular-nums; }
+.wards-leading .wl i { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+
+/* Ticker: latest post pinned left (with its first sentence on wide screens); earlier posts drift past on the right. */
+#tkBody { flex: 0 100 auto; color: var(--ink-2); font-weight: 400; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+#tkBody:not(:empty)::before { content: "—"; margin-right: 6px; color: var(--muted); }
+#tkText { flex: 0 1 auto; min-width: 0; }
+.tk-more { flex: 1; min-width: 0; overflow: hidden; position: relative; border-left: 1px solid var(--border); padding-left: 10px; -webkit-mask-image: linear-gradient(90deg, transparent, #000 24px, #000 calc(100% - 32px), transparent); mask-image: linear-gradient(90deg, transparent, #000 24px, #000 calc(100% - 32px), transparent); }
+.tk-more:empty { display: none; }
+.tk-track { display: inline-flex; gap: 22px; white-space: nowrap; will-change: transform; }
+.tk-track.go { animation: tk-scroll var(--dur, 60s) linear infinite; }
+.tk-more:hover .tk-track, .tk-more:focus-within .tk-track { animation-play-state: paused; }
+@keyframes tk-scroll { to { transform: translateX(-50%); } }
+.tk-item { border: 0; background: none; padding: 0; font: inherit; font-size: 12.5px; color: var(--ink-2); cursor: pointer; }
+.tk-item time { color: var(--muted); margin-right: 6px; font-variant-numeric: tabular-nums; }
+.tk-item:hover { color: var(--ink); text-decoration: underline; text-underline-offset: 3px; text-decoration-color: var(--axis); }
+@media (max-width: 1099px) { #tkBody { display: none; } }
+@media (max-width: 700px) { .tk-more { display: none; } #tickerBtn { max-width: none; flex: 1; } }
+@media (prefers-reduced-motion: reduce) { .tk-track.go { animation: none; } .tk-more { overflow-x: auto; scrollbar-width: none; } }
+
+.tk-dot { width: 6px; height: 6px; border-radius: 50%; background: #fff; animation: tk-pulse 1.6s ease-in-out infinite; }
+@keyframes tk-pulse { 0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(255,255,255,.7); } 50% { opacity: .55; box-shadow: 0 0 0 3px rgba(255,255,255,0); } }
+@media (prefers-reduced-motion: reduce) { .tk-dot { animation: none; } }
 </style>
 </head>
 <body>
@@ -630,7 +660,8 @@ body.watching .toast { bottom: 120px; }
     <h1>Toronto 2026 Municipal Election</h1>
     <div class="sub">Unofficial results - mayor, council and school trustees</div>
   </div>
-  <button id="status" class="status" type="button"><i></i><span id="statusText">Connecting to results…</span></button>
+  <div class="status-wrap"><button id="status" class="status" type="button"><i></i><span id="statusText">Connecting to results…</span></button>
+  <span id="fresh" class="fresh"></span></div>
   <button id="aboutBtn" class="about-btn" type="button">About</button>
   <button id="themeBtn" class="about-btn theme-btn" type="button"></button>
   <button id="shareBtn" class="about-btn theme-btn share-btn" type="button"><span id="shareIco"></span><span id="shareLbl" class="lbl">Share</span></button>
@@ -638,7 +669,7 @@ body.watching .toast { bottom: 120px; }
 </header>
 <div id="notice" class="banner" hidden></div>
 <div id="toast" class="toast" role="status" aria-live="polite"></div>
-<div id="ticker" class="ticker" hidden><span class="tk-live">Live</span><button id="tickerBtn" type="button" title="Open live updates"><time id="tkTime"></time><span id="tkText"></span></button><button id="tickerOff" class="tk-off" type="button" aria-label="Hide the headline ticker" title="Hide the ticker (turn it back on in the Live tab)"><svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button></div>
+<div id="ticker" class="ticker" hidden><span class="tk-live"><i class="tk-dot" aria-hidden="true"></i>Live</span><button id="tickerBtn" type="button" title="Open live updates"><time id="tkTime"></time><span id="tkText"></span><span id="tkBody"></span></button><div id="tkMore" class="tk-more" aria-label="Earlier updates"></div><button id="tickerOff" class="tk-off" type="button" aria-label="Hide the headline ticker" title="Hide the ticker (turn it back on in the Live tab)"><svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button></div>
 
 <main>
   <div id="left">
@@ -759,6 +790,6 @@ body.watching .toast { bottom: 120px; }
 
 <div id="tip" role="tooltip"></div>
 <div id="callTip" role="tooltip"></div>
-<script src="app.js?v=20261026-hold1"></script>
+<script src="app.js?v=20261026-tk2"></script>
 </body>
 </html>

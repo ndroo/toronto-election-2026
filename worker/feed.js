@@ -37,7 +37,7 @@ export function callRace(r, estLeft) {
   if (r.tied) return 'tied';
   if (r.complete) return 'decided';
   const gap = a.votes - b.votes;
-  const maxLeft = Math.max(0, r.totalVoters - r.votes);
+  const maxLeft = Math.max(0, r.totalVoters - (r.ballots ?? r.votes));
   if (gap > maxLeft) return 'decided';
   const left = Math.min(maxLeft, (estLeft ?? (r.votes / r.rec) * (r.polls - r.rec)) * CALL.safety);
   const topTwo = r.votes ? left * ((a.votes + b.votes) / r.votes) : 0;
@@ -70,11 +70,13 @@ export function snapshot(all, wbw, inc = null) {
   const byWard = {};
   for (const c of wbw?.office?.candidate || []) for (const w of c.ward || []) (byWard[int(w.num)] ||= { w, cands: [] }).cands.push({ name: c.name, votesReceived: w.votesReceived });
   const perPoll = mayor.rec ? mayor.votes / mayor.rec : 0;
-  let left = 0;
+  let left = 0, ballots = 0;
   for (const { w, cands } of Object.values(byWard)) {
-    const r = race({ ...w, votesReceived: w.votesCounted }, cands, int(w.votesCounted));
+    const r = race({ ...w, votesReceived: null, votesCounted: null }, cands);
     left += (r.rec ? r.votes / r.rec : perPoll) * (r.polls - r.rec);
+    ballots += int(w.votesCounted) || r.votes;
   }
+  mayor.ballots = Math.max(ballots, mayor.votes);
   mayor.status = callRace(mayor, left);
   keep('mayor', mayor, { kind: 'mayor', label: 'mayor' });
   for (const w of councilO?.ward || []) {
