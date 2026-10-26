@@ -392,6 +392,8 @@
       </li>`;
     }).join('');
   }
+  // Thin progress bar; `done` turns it green when every poll is in.
+  const meter = (frac, done = false) => `<span class="meter${done ? ' done' : ''}"><i style="width:${clamp(frac) * 100}%"></i></span>`;
   const raceMeta = (r) => r ? `${fmt(r.pollsReceived)}/${fmt(r.polls)} polls · ${fmt(r.votes)} votes${r.complete ? ' · all in' : ''}` : '';
 
   function renderWard() {
@@ -408,9 +410,9 @@
       <div class="ward-head">
         <div class="ward-title"><span class="wn">Ward ${n}</span><span class="wname">${esc(w.name || '')}</span>
           <span class="pinned">${hover && hover !== pinned ? 'preview · click to pin' : 'pinned'}</span></div>
-        <div class="ward-sub">${rep ? `<span>${fmt(rep.pollsReceived)} of ${fmt(rep.polls)} polls reporting (${pct(rep.polls ? (rep.pollsReceived / rep.polls) * 100 : 0, 0)})</span>
-          <span>${fmt(rep.totalVoters)} electors</span>
-          <span>Turnout ${pct(rep.totalVoters ? (rep.votes / rep.totalVoters) * 100 : 0)}</span>` : ''}</div>
+        <div class="ward-sub">${rep ? `<span>${fmt(rep.pollsReceived)} of ${fmt(rep.polls)} polls reporting (${pct(rep.polls ? (rep.pollsReceived / rep.polls) * 100 : 0, 0)})${meter(rep.polls ? rep.pollsReceived / rep.polls : 0, rep.complete)}</span>
+          <span>Turnout ${pct(rep.totalVoters ? (rep.votes / rep.totalVoters) * 100 : 0)}${meter(rep.totalVoters ? rep.votes / rep.totalVoters : 0)}</span>
+          <span>${fmt(rep.totalVoters)} electors</span>` : ''}</div>
       </div>
       <div class="races">
         <div class="race"><div class="race-head"><h3>Council</h3><span class="meta">${raceMeta(w.council)}</span></div>
@@ -437,12 +439,12 @@
     const wards = Object.values(model.wards);
     const wardsDone = wards.filter((w) => (w.mayor || w.council)?.complete).length;
     const s = [
-      ['Polls reporting', `${fmt(r.pollsReceived)}/${fmt(r.polls)} (${pct(r.polls ? (r.pollsReceived / r.polls) * 100 : 0, 0)})`],
-      ['Wards complete', `${wardsDone}/${wards.length}`],
-      ['Mayor ballots', fmt(r.votes)],
-      ['Turnout', `${pct(r.totalVoters ? (r.votes / r.totalVoters) * 100 : 0)} of ${fmt(r.totalVoters)}`],
+      ['Polls reporting', `${fmt(r.pollsReceived)}/${fmt(r.polls)} (${pct(r.polls ? (r.pollsReceived / r.polls) * 100 : 0, 0)})`, meter(r.polls ? r.pollsReceived / r.polls : 0, r.complete)],
+      ['Wards complete', `${wardsDone}/${wards.length}`, meter(wards.length ? wardsDone / wards.length : 0, wards.length > 0 && wardsDone === wards.length)],
+      ['Mayor ballots', fmt(r.votes), '<span class="meter blank"></span>'],
+      ['Turnout', `${pct(r.totalVoters ? (r.votes / r.totalVoters) * 100 : 0)} of ${fmt(r.totalVoters)}`, meter(r.totalVoters ? r.votes / r.totalVoters : 0)],
     ];
-    $('#stats').innerHTML = s.map(([k, v]) => `<div class="stat"><b>${v}</b><span>${k}</span></div>`).join('');
+    $('#stats').innerHTML = s.map(([k, v, m]) => `<div class="stat"><b>${v}</b>${m}<span>${k}</span></div>`).join('');
   }
 
   function renderStatus() {
@@ -497,8 +499,8 @@
         const rp = r?.polls ? r.pollsReceived / r.polls : 0;
         return `<tr data-w="${w.num}" class="${String(w.num) === pinned ? 'pinned' : ''}${String(w.num) === hover ? ' hot' : ''}">
           <td class="n">${w.num}</td><td>${esc(w.name)}</td>
-          <td><span class="num">${r ? `${r.pollsReceived}/${r.polls}` : ''}</span>${r?.complete ? ' <span class="done">&#10003;</span>' : ''}</td>
-          <td class="n">${pct(COLS[3].v(w) * 100)}</td>
+          <td><span class="num">${r ? `${r.pollsReceived}/${r.polls}` : ''}</span>${r?.complete ? ' <span class="done">&#10003;</span>' : ''}${meter(rp, r?.complete)}</td>
+          <td class="n">${pct(COLS[3].v(w) * 100)}${meter(COLS[3].v(w))}</td>
           <td>${who(w.mayor, true)}</td><td class="n">${w.mayor?.leader ? `${pct(w.mayor.leader.pct)}<span class="sub">+${w.mayor.margin.toFixed(1)}</span>` : ''}</td>
           <td>${who(w.council)}<span class="sub">of ${w.council?.cands.length ?? 0}</span></td><td class="n">${w.council?.leader ? `${pct(w.council.leader.pct)}<span class="sub">+${w.council.margin.toFixed(1)}</span>` : ''}</td>
           </tr>`;
