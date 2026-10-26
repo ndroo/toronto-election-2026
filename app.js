@@ -463,20 +463,21 @@
 
   // Always two rows (key, then notes) so switching modes never changes the card's height.
   function renderLegend() {
-    const ramp = (lo, hi) => `${lo}<span class="ramp">${seqRamp().map((c) => `<span style="background:${c}"></span>`).join('')}</span>${hi}`;
+    // Ramp first at a fixed position, label after, so the bar never moves between modes.
+    const ramp = (lo, hi, label) => `<span class="rk"><span class="lo">${lo}</span><span class="ramp">${seqRamp().map((c) => `<span style="background:${c}"></span>`).join('')}</span><span class="hi">${hi}</span></span><span>${label}</span>`;
     const sw = (bg, label) => `<span><i class="sw" style="background:${bg}"></i>${label}</span>`;
     let key, note;
     if (mode === 'mayor') {
       key = [...colorOf.entries()].sort((a, b) => a[1] - b[1]).map(([n, s]) => sw(`var(--s${s})`, esc(n))).join('') + sw('var(--other)', 'Other / tied');
       note = 'Darker = wider lead';
     } else if (mode === 'council') {
-      key = `<span>Council leader's lead over 2nd: ${ramp('0', '40+ pts')}</span>`;
+      key = ramp('0', '40+ pts', "Council leader's lead over 2nd place");
       note = 'Darker = safer seat';
     } else if (mode === 'reporting') {
-      key = `<span>Polls reporting: ${ramp('0%', '100%')}</span>`;
+      key = ramp('0%', '100%', 'Polls reporting');
       note = 'Darker = more counted';
     } else {
-      key = `<span>Turnout, mayor ballots ÷ electors: ${ramp('0%', '60%+')}</span>`;
+      key = ramp('0%', '60%+', 'Turnout (mayor ballots ÷ electors)');
       note = 'Darker = higher turnout';
     }
     $('#legend').innerHTML = `<div class="lg-row">${key}</div>
@@ -566,8 +567,8 @@
       <div class="ward-head">
         <div class="ward-title"><span class="wn">Ward ${n}</span><span class="wname">${esc(w.name || '')}</span>
           <span class="pinned">${hover && hover !== pinned ? 'preview · click to pin' : 'pinned'}</span></div>
-        <div class="ward-sub">${rep ? `<span>${fmt(rep.pollsReceived)} of ${fmt(rep.polls)} polls reporting (${pct(rep.polls ? (rep.pollsReceived / rep.polls) * 100 : 0, 0)})${meter(rep.polls ? rep.pollsReceived / rep.polls : 0, rep.complete)}</span>
-          <span>Turnout ${pct(rep.totalVoters ? (rep.votes / rep.totalVoters) * 100 : 0)}${meter(rep.totalVoters ? rep.votes / rep.totalVoters : 0)}</span>
+        <div class="ward-sub">${rep ? `<span class="ws"><span class="wt wt-polls">${fmt(rep.pollsReceived)}/${fmt(rep.polls)} polls · ${pct(rep.polls ? (rep.pollsReceived / rep.polls) * 100 : 0, 0)}</span>${meter(rep.polls ? rep.pollsReceived / rep.polls : 0, rep.complete)}</span>
+          <span class="ws"><span class="wt wt-turn">Turnout ${pct(rep.totalVoters ? (rep.votes / rep.totalVoters) * 100 : 0)}</span>${meter(rep.totalVoters ? rep.votes / rep.totalVoters : 0)}</span>
           <span>${fmt(rep.totalVoters)} electors</span>` : ''}</div>
       </div>
       <div class="races">
