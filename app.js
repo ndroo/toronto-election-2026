@@ -67,7 +67,11 @@
   let userPinned = false; // set once the person picks a ward themselves this visit
   let hover = null;
   let sort = { key: 'num', dir: 1 };
-  let tab = ['ward', 'wards', 'school', 'method'].includes(hash.get('t')) ? hash.get('t') : 'ward';
+  let tab = { school: 'wards' }[hash.get('t')] || (['ward', 'wards', 'method'].includes(hash.get('t')) ? hash.get('t') : 'ward');
+  let racesView = hash.get('t') === 'school' ? 3 : 'council'; // 'council' or a school board office id
+  // Ward tabs the person has opened (up to 5), remembered on this device.
+  const MAX_WARD_TABS = 5;
+  let openWards = (hash.get('o') || store.get('openWards') || '').split(',').filter(Boolean);
   let board = null; // selected school board office id
   let flashNow = false; // only animate vote changes on data updates, not on hover re-renders
 
@@ -624,6 +628,7 @@
   }
   function setPinned(n, byUser = false) {
     pinned = String(n);
+    openWardTab(pinned);
     store.set('lastWard', pinned);
     if (byUser) userPinned = true;
     saveHash();
@@ -631,7 +636,7 @@
     for (const tr of document.querySelectorAll('#wardTable tbody tr')) tr.classList.toggle('pinned', tr.dataset.w === pinned);
     renderWard();
   }
-  function saveHash() { history.replaceState(null, '', `#w=${pinned}&m=${mode}&t=${tab}`); }
+  function saveHash() { history.replaceState(null, '', `#w=${pinned}&o=${openWards.join(',')}&m=${mode}&t=${tab}`); }
 
   const tip = $('#tip');
   function placeTip(x, y) {
@@ -680,7 +685,7 @@
       const lead = r.leader && i === 0 && !r.tied;
       const col = colour ? candColour(c.name) : null;
       const st = r.call?.status;
-      const tag = lead && showCall && CALLED.has(st) ? `<span class="tag tag-${st}">${{ projected: 'Projected', decided: 'Winner', official: 'Official', acclaimed: 'Acclaimed' }[st]}</span>` : '';
+      const tag = lead && showCall && CALLED.has(st) ? `<span class="tick tick-${st}" title="${CALL_LABEL[st].replace(/&[^;]+;\s*/g, '')}">&#10003;</span>` : '';
       const k = esc(`${r.key}|${c.name}`);
       return `<li class="cand${lead ? ' lead' : ''}" data-fk="${k}" title=""${esc(c.name)}: ${fmt(c.votes)} votes (${pct(c.pct, 2)})${c.delta ? `, +${fmt(c.delta)} since last update` : ''}">
         ${avatar(r.pkey, c.name, col)}
@@ -698,7 +703,6 @@
 
   function renderWard() {
     const n = hover || pinned;
-    $('#tabWard').textContent = pinned;
     const el = $('#panel-ward');
     if (!model || !n) { el.innerHTML = `<div class="skeleton">${'<i></i>'.repeat(8)}</div>`; return; }
     const w = model.wards[n] || { name: geo.wards[n]?.name };
@@ -736,32 +740,39 @@
       <div class="call-why">The mayor's race is called on the city-wide count (left), not ward by ward.</div>`;
   }
 
-  // City-wide mayor: the top five as cards (they're who matters on the night), with the full field one click away.
-  const TOP_N = 5;
-  let cityAll = false;
+  // City-wide mayor: every candidate as a card, in rank order; the top five are what's in view.
   function renderCity() {
     const r = model.mayor;
     $('#cityMeta').textContent = raceMeta(r);
     $('#cityCall').innerHTML = callRow(r, { reason: false }); // the reason is in the badge's hover card; space is tight here
     const st = r.call?.status;
     const max = Math.max(1, ...r.cands.map((c) => c.pct));
-    $('#cityTop').innerHTML = r.cands.slice(0, TOP_N).map((c, i) => {
+    $('#cityTop').innerHTML = r.cands.map((c, i) => {
       const k = esc(`city|${c.name}`), col = candColour(c.name);
       const lead = i === 0 && r.leader && !r.tied;
-      const tag = lead && CALLED.has(st) ? `<span class="tag tag-${st}">${{ projected: 'Projected', decided: 'Winner', official: 'Official', acclaimed: 'Acclaimed' }[st]}</span>` : '';
+      const tag = lead && CALLED.has(st) ? `<span class="tick tick-${st}" title="${CALL_LABEL[st].replace(/&[^;]+;\s*/g, '')}">&#10003;</span>` : '';
       return `<div class="pc${lead ? ' first' : ''}" data-fk="${k}" title="${esc(c.name)}: ${fmt(c.votes)} votes (${pct(c.pct, 2)})">
-        <span class="pc-rank">${i + 1}</span><span class="delta">${c.delta ? `+${fmt(c.delta)}` : ''}</span>
+        <span class="pc-rank">${i + 1}</span>
         ${avatar('mayor', c.name, col)}
         <div class="pc-name">${esc(c.name)}</div>${tag}
         <div class="pc-nums"><b data-ok="pp|${k}">${pct(c.pct)}</b><span data-ok="pv|${k}">${fmt(c.votes)}</span></div>
+        <div class="pc-delta"><span class="delta">${c.delta ? `+${fmt(c.delta)}` : ''}</span></div>
         <div class="pc-bar"><i data-bk="${k}" style="width:${(c.pct / max) * 100}%;${col ? `background:${col}` : ''}"></i></div>
       </div>`;
     }).join('');
-    $('#cityList').innerHTML = cityAll ? candList(r, { colour: true }) : '';
-    $('#cityMore').textContent = cityAll ? `Show top ${TOP_N}` : `See all ${r.cands.length} candidates`;
-    $('#cityCard').classList.toggle('all', cityAll);
+    updateCityArrows();
   }
-  $('#cityMore').addEventListener('click', () => { cityAll = !cityAll; renderCity(); });
+  // Five cards fit at once; the rest are a sideways scroll (trackpad, swipe or the arrows).
+  function updateCityArrows() {
+    const el = $('#cityTop');
+    $('#cityPrev').disabled = el.scrollLeft < 4;
+    $('#cityNext').disabled = el.scrollLeft + el.clientWidth > el.scrollWidth - 4;
+    $('#cityCard').classList.toggle('more-right', !$('#cityNext').disabled);
+  }
+  const pageCity = (dir) => { const el = $('#cityTop'); el.scrollBy({ left: dir * el.clientWidth, behavior: 'smooth' }); };
+  $('#cityPrev').addEventListener('click', () => pageCity(-1));
+  $('#cityNext').addEventListener('click', () => pageCity(1));
+  $('#cityTop').addEventListener('scroll', updateCityArrows, { passive: true });
 
   function renderStats() {
     const r = model.mayor;
@@ -852,26 +863,67 @@
   $('#wardTable').addEventListener('mouseleave', () => setHover(null));
 
   const BOARD_SHORT = { 'Toronto District School Board': 'TDSB', 'Toronto Catholic District School Board': 'TCDSB', 'Conseil scolaire Viamonde': 'Viamonde', 'Conseil scolaire catholique MonAvenir': 'MonAvenir' };
+  // "All races": one switch between the 25-ward council table and each school board's trustee races.
   function renderBoards() {
-    if (!model.boards.some((b) => b.id === board)) board = model.boards[0]?.id ?? null;
-    $('#tabSchool').textContent = model.boards.length || '';
-    $('#boardTabs').innerHTML = model.boards.map((b) =>
-      `<button data-b="${b.id}" aria-pressed="${b.id === board}" title="${esc(b.name)}">${esc(BOARD_SHORT[b.name] || b.name)} <span style="opacity:.7">· ${b.wards.length}</span></button>`).join('');
-    const b = model.boards.find((x) => x.id === board);
+    if (racesView !== 'council' && !model.boards.some((b) => b.id === racesView)) racesView = 'council';
+    $('#raceSwitch').innerHTML = `<button data-v="council" aria-pressed="${racesView === 'council'}">City council <span style="opacity:.7">· 25</span></button>`
+      + model.boards.map((b) => `<button data-v="${b.id}" aria-pressed="${b.id === racesView}" title="${esc(b.name)}">${esc(BOARD_SHORT[b.name] || b.name)} <span style="opacity:.7">· ${b.wards.length}</span></button>`).join('');
+    $('#councilView').hidden = racesView !== 'council';
+    $('#boardView').hidden = racesView === 'council';
+    const b = model.boards.find((x) => x.id === racesView);
     $('#boards').innerHTML = b ? `<div class="board-grid">${b.wards.map((w) => `
-      <div class="board-ward"><div class="race-head"><h3>${esc(BOARD_SHORT[b.name] || b.name)} Ward ${esc(w.num)}${w.name ? ` - ${esc(w.name)}` : ''}</h3>${badge(w.race.call)}<span class="meta">${raceMeta(w.race)}</span></div>
-      <ul class="cands dense">${candList(w.race)}</ul></div>`).join('')}</div>` : '<div class="empty">No school board races in the feed.</div>';
+      <div class="board-ward"><div class="race-head"><h3>${esc(BOARD_SHORT[b.name] || b.name)} Ward ${esc(w.num)}${w.name ? ` - ${esc(w.name)}` : ''}</h3><span class="meta">${raceMeta(w.race)}</span></div>
+      <div class="bw-call">${badge(w.race.call)}</div>
+      <ul class="cands dense">${candList(w.race)}</ul></div>`).join('')}</div>` : '';
   }
-  $('#boardTabs').addEventListener('click', (e) => { const btn = e.target.closest('button'); if (btn) { board = int(btn.dataset.b); renderBoards(); } });
+  $('#raceSwitch').addEventListener('click', (e) => {
+    const btn = e.target.closest('button'); if (!btn) return;
+    racesView = btn.dataset.v === 'council' ? 'council' : int(btn.dataset.v);
+    renderBoards();
+  });
+
+  // ---------- ward tabs ----------
+  function openWardTab(n) {
+    n = String(n);
+    if (!openWards.includes(n)) {
+      openWards.push(n);
+      // Over the limit: drop the oldest tab that isn't the person's own ward or the one being opened.
+      while (openWards.length > MAX_WARD_TABS) {
+        const drop = openWards.findIndex((w) => w !== myWard && w !== n);
+        openWards.splice(drop < 0 ? 0 : drop, 1);
+      }
+      store.set('openWards', openWards.join(','));
+    }
+    renderTabs();
+  }
+  function closeWardTab(n) {
+    if (openWards.length <= 1) return;
+    openWards = openWards.filter((w) => w !== n);
+    store.set('openWards', openWards.join(','));
+    if (pinned === n) { setPinned(openWards[openWards.length - 1]); }
+    renderTabs(); saveHash();
+  }
+  function renderTabs() {
+    $('#wardTabs').innerHTML = openWards.map((n) => {
+      const sel = tab === 'ward' && n === pinned;
+      return `<button role="tab" class="wt" data-tab="ward" data-w="${n}" aria-selected="${sel}" title="Ward ${n} - ${esc(geo?.wards[n]?.name || '')}">${n === myWard ? PIN_SVG : ''}Ward ${n}${openWards.length > 1 ? `<span class="wt-x" data-close="${n}" role="button" aria-label="Close Ward ${n}">&times;</span>` : ''}</button>`;
+    }).join('') + (openWards.length < 2 ? '<span class="tab-hint">Click wards on the map to compare them side by side</span>' : '');
+  }
+  const PIN_SVG = '<svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><path d="M8 1.5a4.5 4.5 0 0 0-4.5 4.5c0 3.3 4.5 8.5 4.5 8.5s4.5-5.2 4.5-8.5A4.5 4.5 0 0 0 8 1.5Zm0 6.2a1.7 1.7 0 1 1 0-3.4 1.7 1.7 0 0 1 0 3.4Z" fill="currentColor"/></svg>';
 
   // ---------- tabs ----------
   function setTab(t) {
     tab = t;
-    for (const b of document.querySelectorAll('.tabs button')) b.setAttribute('aria-selected', String(b.dataset.tab === t));
+    for (const b of document.querySelectorAll('.tabs button')) b.setAttribute('aria-selected', String(b.dataset.tab === t && (t !== 'ward' || b.dataset.w === pinned)));
     for (const p of document.querySelectorAll('#right .panel')) p.hidden = p.id !== `panel-${t}`;
     saveHash();
   }
-  $('.tabs').addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) setTab(b.dataset.tab); });
+  $('.tabs').addEventListener('click', (e) => {
+    const x = e.target.closest('[data-close]');
+    if (x) { e.stopPropagation(); closeWardTab(x.dataset.close); return; }
+    const b = e.target.closest('button'); if (!b) return;
+    if (b.dataset.w) { setPinned(b.dataset.w); setTab('ward'); } else setTab(b.dataset.tab);
+  });
 
   // ---------- motion ----------
   // Only on data updates: changed digits roll like an odometer, rows slide to their new places,
@@ -920,7 +972,12 @@
     for (const el of document.querySelectorAll('[data-ok]')) {
       const k = el.dataset.ok, now = el.textContent, before = odoPrev.get(k);
       odoPrev.set(k, now);
-      if (motion && before != null && before !== now && el.offsetParent) el.innerHTML = rollHTML(before, now, startFor(el));
+      if (motion && before != null && before !== now && el.offsetParent) {
+        const t = startFor(el);
+        el.innerHTML = rollHTML(before, now, t);
+        // Once every digit has turned, put the plain number back so nothing can stay misaligned.
+        setTimeout(() => { if (el.querySelector('.roll')) el.textContent = now; }, t + now.length * 120 + 1300);
+      }
     }
     if (!motion) {
       for (const el of document.querySelectorAll('[data-fk] .delta')) { const row = el.closest('[data-fk]')?.dataset.fk; if (row) deltaPrev.set(row, el.textContent); }
@@ -1054,6 +1111,7 @@
   }
   function renderMe() {
     meLayer.innerHTML = myPoint ? `<circle class="me-halo" cx="${myPoint.x}" cy="${myPoint.y}" r="14"/><circle class="me-dot" cx="${myPoint.x}" cy="${myPoint.y}" r="6"/>` : '';
+    renderTabs();
     $('#findWardBtn').innerHTML = myWard ? `${PIN_ICON} Your ward: ${myWard}` : `${PIN_ICON} Find my ward`;
   }
   function useWard(num, pt, { jump = true } = {}) {
@@ -1131,6 +1189,8 @@
     photos = Object.fromEntries(Object.entries(ph).map(([k, v]) => { const [a, b] = k.split('|'); return [`${a}|${normName(b)}`, v]; }));
     buildMap();
     if (!geo.wards[pinned]) pinned = '1';
+    openWards = openWards.filter((w) => geo.wards[w]);
+    openWardTab(pinned);
     setTab(tab);
     renderMethod();
     renderMap(); renderWard(); renderMe();
