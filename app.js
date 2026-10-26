@@ -205,7 +205,8 @@
     if (!r) return '';
     const [a, b] = r.cands;
     let txt;
-    if (r.cands.length === 1) txt = `<b>${esc(a.name)}</b> is the only candidate`;
+    if (r.cands.length > 1 && !r.leader && r === model?.mayor) txt = `${r.cands.length} candidates, listed A–Z until votes are counted`;
+    else if (r.cands.length === 1) txt = `<b>${esc(a.name)}</b> is the only candidate`;
     else if (!r.leader) txt = `${r.cands.length} candidate${r.cands.length === 1 ? '' : 's'} · no votes counted yet`;
     else if (r.tied) txt = `<b>${esc(a.name)}</b> and <b>${esc(b.name)}</b> are tied at ${fmt(a.votes)}`;
     else if (!b) txt = `<b>${esc(a.name)}</b> is the only candidate`;
@@ -728,6 +729,10 @@
           <div class="scroller"><ul class="cands">${candList(w.mayor, { colour: true, showCall: false })}</ul></div></div>
       </div>`;
     el.querySelectorAll('.scroller').forEach((x, i) => { if (keep[i]) x.scrollTop = keep[i]; });
+    // Both summaries take the taller one's height so the two candidate lists start on the same line.
+    const sums = [...el.querySelectorAll('.race-sum')];
+    const h = Math.max(...sums.map((x) => x.scrollHeight));
+    sums.forEach((x) => { x.style.height = `${h}px`; });
   }
 
   // Same shape as the council summary, so both columns line up, but scoped to this ward and never a call.
@@ -747,17 +752,18 @@
     $('#cityCall').innerHTML = callRow(r, { reason: false }); // the reason is in the badge's hover card; space is tight here
     const st = r.call?.status;
     const max = Math.max(1, ...r.cands.map((c) => c.pct));
+    const counting = r.votes > 0; // before the first results the order is just A-Z, so no ranks or zeros
     $('#cityTop').innerHTML = r.cands.map((c, i) => {
       const k = esc(`city|${c.name}`), col = candColour(c.name);
       const lead = i === 0 && r.leader && !r.tied;
       const tag = lead && CALLED.has(st) ? `<span class="tick tick-${st}" title="${CALL_LABEL[st].replace(/&[^;]+;\s*/g, '')}">&#10003;</span>` : '';
       return `<div class="pc${lead ? ' first' : ''}" data-fk="${k}" title="${esc(c.name)}: ${fmt(c.votes)} votes (${pct(c.pct, 2)})">
-        <span class="pc-rank">${i + 1}</span>
+        <span class="pc-rank">${counting ? i + 1 : ''}</span>
         ${avatar('mayor', c.name, col)}
         <div class="pc-name">${esc(c.name)}</div>${tag}
-        <div class="pc-nums"><b data-ok="pp|${k}">${pct(c.pct)}</b><span data-ok="pv|${k}">${fmt(c.votes)}</span></div>
+        ${counting ? `<div class="pc-nums"><b data-ok="pp|${k}">${pct(c.pct)}</b><span data-ok="pv|${k}">${fmt(c.votes)}</span></div>
         <div class="pc-delta"><span class="delta">${c.delta ? `+${fmt(c.delta)}` : ''}</span></div>
-        <div class="pc-bar"><i data-bk="${k}" style="width:${(c.pct / max) * 100}%;${col ? `background:${col}` : ''}"></i></div>
+        <div class="pc-bar"><i data-bk="${k}" style="width:${(c.pct / max) * 100}%;${col ? `background:${col}` : ''}"></i></div>` : '<div class="pc-wait">No votes yet</div>'}
       </div>`;
     }).join('');
     const list = cityView === 'list';
