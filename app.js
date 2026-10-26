@@ -182,7 +182,7 @@
     if (rep < CALL.minReporting) return { status: 'early', need, reason: `Only ${pct(rep * 100, 0)} of polls are in. Calls start at ${CALL.minReporting * 100}%.` };
     return { status: need >= CALL.needShare || need - hasNow >= CALL.swing ? 'projected' : 'close', need, reason: why };
   }
-  const CALL_LABEL = { acclaimed: '&#10003; Acclaimed', official: '&#10003; Official winner', decided: '&#10003; Winner &middot; unofficial', projected: '&#9670; Projected winner', close: 'Too close to call', early: 'Too early to call', tied: 'Tied', awaiting: 'No results yet' };
+  const CALL_LABEL = { acclaimed: '&#10003; Acclaimed', official: '&#10003; Official winner', decided: '&#10003; Winner &middot; unofficial', projected: '&#10003; Projected winner', close: 'Too close to call', early: 'Too early to call', tied: 'Tied', awaiting: 'No results yet' };
   const CALLED = new Set(['projected', 'decided', 'official', 'acclaimed']);
   // One definition per label, shared by the hover card and the Methodology tab.
   const CALL_DEF = {
@@ -555,7 +555,7 @@
       if (!a) { lbl.setAttribute('y', g.ly); lbl.classList.remove('small'); continue; }
       const r1 = clamp(wardSize[num] * 0.15, 16, 28);
       const faces = [{ c: a, ph: pa, rad: r1, x: g.lx, y: g.ly, lead: true }];
-      // Council view: the face also shows the state of the race. Faded = not called, blue + ◆ = projected,
+      // Council view: the face also shows the state of the race. Faded = not called, blue + ✓ = projected,
       // green + ✓ = settled. (The mayor's race is only called city-wide, so mayor faces stay plain.)
       const st = mode === 'council' ? r.call?.status : null;
       const settled = st === 'decided' || st === 'official' || st === 'acclaimed';
@@ -566,7 +566,7 @@
         const id = `fc${clipId++}`;
         const badge = settled || st === 'projected'
           ? `<circle cx="${f.x + f.rad * 0.74}" cy="${f.y + f.rad * 0.74}" r="${f.rad * 0.42}" fill="${ring}" stroke="${css('--surface')}" stroke-width="1.5"/>
-             <text x="${f.x + f.rad * 0.74}" y="${f.y + f.rad * 0.76}" class="face-badge" style="font-size:${f.rad * 0.5}px">${settled ? '&#10003;' : '&#9670;'}</text>` : '';
+             <text x="${f.x + f.rad * 0.74}" y="${f.y + f.rad * 0.76}" class="face-badge" style="font-size:${f.rad * 0.5}px">&#10003;</text>` : '';
         parts.push(`<g class="face${pending ? ' pending' : ''}"><title>${esc(f.c.name)} ${pct(f.c.pct)}${st ? ` - ${CALL_LABEL[st].replace(/&[^;]+;\s*/g, '')}` : ''}</title>
           <circle cx="${f.x}" cy="${f.y}" r="${f.rad + 2.5}" fill="${pending ? css('--surface') : ring}"${pending ? ` stroke="${ring}" stroke-width="1.5" stroke-dasharray="3 2.5"` : ''}/>
           ${f.ph ? `<clipPath id="${id}"><circle cx="${f.x}" cy="${f.y}" r="${f.rad}"/></clipPath>
@@ -590,7 +590,7 @@
       note = 'Darker = wider lead';
     } else if (mode === 'council') {
       key = ramp('0', '40+ pts', "Council leader's lead over 2nd place");
-      note = '<span class="lg-faces"><i class="lf pend"></i>Not called <i class="lf proj">&#9670;</i>Projected <i class="lf won">&#10003;</i>Winner</span>';
+      note = '<span class="lg-faces"><i class="lf pend"></i>Not called <i class="lf proj">&#10003;</i>Projected <i class="lf won">&#10003;</i>Winner</span>';
     } else if (mode === 'reporting') {
       key = ramp('0%', '100%', 'Polls reporting');
       note = 'Darker = more counted';
@@ -821,12 +821,12 @@
       return (typeof x === 'string' ? x.localeCompare(y) : x - y) * sort.dir || a.num - b.num;
     });
     // Every row gets the leader's photo (initials if none). Mayor: ring in their map colour.
-    // Council: a status badge like the map's (blue ◆ projected, green ✓ winner, dashed grey not called).
+    // Council: a status badge like the map's (blue ✓ projected, green ✓ winner, dashed grey not called).
     const who = (r, colour) => {
       if (!r?.leader) return `<span class="who"><span class="avw"><span class="av av-i av-none"></span></span><span class="who-n muted">No votes yet</span></span>`;
       const c = r.cands[0], st = r.call?.status;
       const ring = colour ? (r.tied ? css('--other') : candColour(c.name) || css('--other')) : null;
-      const badge = colour ? '' : `<span class="sb sb-${CALLED.has(st) ? st : 'pending'}">${st === 'projected' ? '&#9670;' : CALLED.has(st) ? '&#10003;' : ''}</span>`;
+      const badge = colour ? '' : `<span class="sb sb-${CALLED.has(st) ? st : 'pending'}">${st === 'projected' ? '&#10003;' : CALLED.has(st) ? '&#10003;' : ''}</span>`;
       const name = r.tied ? `Tied: ${esc(c.name)} &amp; ${esc(r.cands[1].name)}` : esc(c.name);
       return `<span class="who"><span class="avw">${avatar(r.pkey, c.name, ring)}${badge}</span><span class="who-n">${name}</span></span>`;
     };
