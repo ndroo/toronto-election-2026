@@ -294,13 +294,13 @@
       </section>
 
       <section id="m-incumbents"><h3>Incumbents</h3>
-      <p>The City's results feed doesn't say who already holds each seat, so "Incumbent" labels come from a list made for this page from the City's <a href="https://www.toronto.ca/city-government/council/members-of-council/">Members of Council</a> page and news coverage, including by-elections since 2022. They cover the mayor and council only. "Open seat" means the sitting councillor isn't running again in that ward; "Cllr" marks a sitting councillor running for a different seat. "Re-elected" and "unseats" in the live updates follow the same race calls as the rest of the page.</p>
+      <p>The City's results feed doesn't say who already holds each seat, so "Incumbent" labels come from a list made for this page from the City's <a href="https://www.toronto.ca/city-government/council/members-of-council/">Members of Council</a> page and news coverage, including by-elections since 2022. They cover the mayor and council only. "Open seat" means the sitting councillor isn't running again in that ward; "Councillor" marks a sitting councillor running for a different seat (for example, a councillor running for mayor). "Re-elected" and "unseats" in the live updates follow the same race calls as the rest of the page.</p>
       </section>
 
       <section id="m-privacy"><h3>Privacy</h3>
       <p><b>No ads, no cookies, no accounts and no tracking or advertising scripts.</b> Nothing on this page follows you around the web or builds a profile of you, and nothing is sold or shared.</p>
       <p><b>Counting viewers.</b> To see how many people are using the page, your browser makes up a random code (like <code>3f9a0c71b2e48d65</code>) and sends it along when it checks for new results. It isn't linked to your name, account, location or anything else about you; it only lets us count how many browsers have the page open right now and over the last day. The codes are deleted after 24 hours. Only the totals are kept.</p>
-      <p><b>Saved in your browser only.</b> Your watched candidates, theme, ward (if you used "Find my ward"), last ward viewed, open ward tabs, view choices and the random code are kept in your browser's local storage, on your device. They're never sent anywhere except the random code above. Clear this site's data in your browser to remove them all.</p>
+      <p><b>Saved in your browser only.</b> Your watched candidates, theme, ticker setting, ward (if you used "Find my ward"), last ward viewed, open ward tabs, view choices and the random code are kept in your browser's local storage, on your device. They're never sent anywhere except the random code above. Clear this site's data in your browser to remove them all.</p>
       <p><b>Your location</b> never leaves your device. See <a href="#" data-jump="m-location">Your location</a>.</p>
       <p><b>Hosting.</b> The page is served by GitHub Pages, and results pass through a small Cloudflare Worker (or GitHub if that fails). Like any website host, they receive your IP address and browser details to deliver the page, under their own policies (<a href="https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement">GitHub</a>, <a href="https://www.cloudflare.com/privacypolicy/">Cloudflare</a>). We don't collect or keep those request logs. Candidate photos are served from this site, and there are no outside fonts or scripts.</p>
       </section>
@@ -701,9 +701,9 @@
   const raceKeyOf = (r) => (r.key.startsWith('mayor|') ? 'mayor|city' : r.key);
   function incTag(r, name, { short = false } = {}) {
     const held = incumbents?.races?.[raceKeyOf(r)];
-    if (held?.running && held.running === name) return `<span class="inc" title="Incumbent: holds this seat going into the election">${short ? 'Inc.' : 'Incumbent'}</span>`;
+    if (held?.running && held.running === name) return `<span class="inc" title="Holds this seat going into the election">Incumbent</span>`;
     const c = incumbents?.councillors?.[name];
-    if (c && c.runningIn === raceKeyOf(r)) return `<span class="inc cllr" title="Sitting councillor for Ward ${c.ward}, running here">Cllr${short ? '' : `, Ward ${c.ward}`}</span>`;
+    if (c && c.runningIn === raceKeyOf(r)) return `<span class="inc cllr" title="Sitting councillor for Ward ${c.ward}, running for this seat">Councillor${short ? '' : `, Ward ${c.ward}`}</span>`;
     return '';
   }
   const openSeat = (r) => { const held = r && incumbents?.races?.[raceKeyOf(r)]; return held && !held.running ? held.incumbent : null; };
@@ -1015,6 +1015,7 @@
   // Posts come from the Worker, which writes one feed for everyone. In ?demo they're made here from the
   // simulated count, with the same rules and wording (worker/feed.js), so the layout can be previewed.
   let posts = [];
+  let tickerOn = store.get('ticker') !== 'off'; // the Live tab is opt-in already; the ticker can be hidden
   let feedSeen = int(store.get('feedSeen'));
   let feedAt = 0, feedLib = null, demoSnap = null, demoPosted = new Set(), demoId = 0;
   const feedTime = (t) => new Date(t).toLocaleTimeString('en-CA', { timeZone: TZ, hour: 'numeric', minute: '2-digit' });
@@ -1044,7 +1045,8 @@
   }
   function renderFeed() {
     const latest = posts[0];
-    $('#ticker').hidden = !latest;
+    $('#ticker').hidden = !latest || !tickerOn;
+    $('#tickerToggle').checked = tickerOn;
     if (latest) {
       const tx = $('#tkText');
       if (tx.dataset.id !== String(latest.id)) {
@@ -1081,6 +1083,9 @@
     }).join('')}</div></div>` : '';
   }
   $('#toWatch').addEventListener('click', (e) => { const g = e.target.closest('[data-go]'); if (g && model) watchedRace(g.dataset.go)?.go(); });
+  const setTicker = (on) => { tickerOn = on; store.set('ticker', on ? 'on' : 'off'); renderFeed(); };
+  $('#tickerOff').addEventListener('click', () => setTicker(false));
+  $('#tickerToggle').addEventListener('change', (e) => setTicker(e.target.checked));
   $('#tickerBtn').addEventListener('click', () => { setTab('feed'); renderFeed(); $('#right').scrollIntoView({ behavior: 'smooth', block: 'start' }); });
 
   $('#raceSwitch').addEventListener('click', (e) => {

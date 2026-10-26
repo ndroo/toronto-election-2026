@@ -605,6 +605,10 @@ svg#map .me-halo { fill: var(--proj); opacity: .25; transform-box: fill-box; tra
 .cand .nm, .wc-race { display: flex; align-items: center; min-width: 0; }
 .nm-t { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .cand .nm .inc, .cand .nm .tick, .wc-race .inc { flex: none; }
+
+.tk-off { flex: none; border: 0; background: none; color: var(--muted); font-size: 18px; line-height: 1; width: 28px; height: 28px; margin: -6px -8px -6px 0; border-radius: 6px; cursor: pointer; }
+.tk-off:hover { color: var(--ink); background: var(--surface-2); }
+.tk-toggle { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--ink-2); cursor: pointer; white-space: nowrap; }
 </style>
 </head>
 <body>
@@ -622,7 +626,7 @@ svg#map .me-halo { fill: var(--proj); opacity: .25; transform-box: fill-box; tra
   <div class="stats" id="stats"></div>
 </header>
 <div id="notice" class="banner" hidden></div>
-<div id="ticker" class="ticker" hidden><span class="tk-live">Live</span><button id="tickerBtn" type="button" title="Open live updates"><time id="tkTime"></time><span id="tkText"></span></button></div>
+<div id="ticker" class="ticker" hidden><span class="tk-live">Live</span><button id="tickerBtn" type="button" title="Open live updates"><time id="tkTime"></time><span id="tkText"></span></button><button id="tickerOff" class="tk-off" type="button" aria-label="Hide the headline ticker" title="Hide the ticker (turn it back on in the Live tab)">&times;</button></div>
 
 <main>
   <div id="left">
@@ -660,7 +664,8 @@ svg#map .me-halo { fill: var(--proj); opacity: .25; transform-box: fill-box; tra
     <div class="panel" id="panel-ward" role="tabpanel" aria-live="polite"></div>
     <div class="panel feed" id="panel-feed" role="tabpanel" hidden>
       <div id="toWatch"></div>
-      <div class="feed-head"><h3>Live updates</h3><span class="feed-sub" id="feedSub">Written automatically from the City's results as they come in</span></div>
+      <div class="feed-head"><h3>Live updates</h3><span class="feed-sub" id="feedSub">Written automatically from the City's results as they come in</span>
+        <label class="tk-toggle"><input type="checkbox" id="tickerToggle"> Show headline ticker</label></div>
       <ol class="posts" id="posts"></ol>
     </div>
     <div class="panel" id="panel-wards" role="tabpanel" hidden>
@@ -742,6 +747,6 @@ svg#map .me-halo { fill: var(--proj); opacity: .25; transform-box: fill-box; tra
 
 <div id="tip" role="tooltip"></div>
 <div id="callTip" role="tooltip"></div>
-<script src="app.js?v=20261026-feed1"></script>
+<script src="app.js?v=20261026-feed3"></script>
 </body>
 </html>
