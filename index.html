@@ -1,0 +1,267 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Toronto 2026 Election Results</title>
+<meta name="description" content="Live unofficial results for Toronto mayor, city council and school trustees, by ward, from the City of Toronto media feed.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect width='16' height='16' rx='3' fill='%232a78d6'/><path d='M4 8.5l2.5 2.5L12 5.5' stroke='white' stroke-width='2' fill='none'/></svg>">
+<style>
+:root {
+  color-scheme: light;
+  --page: #f9f9f7;
+  --surface: #fcfcfb;
+  --surface-2: #f3f2ee;
+  --ink: #0b0b0b;
+  --ink-2: #52514e;
+  --muted: #898781;
+  --grid: #e1e0d9;
+  --axis: #c3c2b7;
+  --border: rgba(11,11,11,0.10);
+  --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a;
+  --other: #b9b8b1;
+  --nodata: #ecebe6;
+  --bar: #c3c2b7;
+  --good: #006300;
+  --critical: #d03b3b;
+  --warn-bg: #fff4d6;
+  --demo: #d03b3b;
+  --seq: #cde2fb,#b7d3f6,#9ec5f4,#86b6ef,#6da7ec,#5598e7,#3987e5,#2a78d6,#256abf,#1c5cab,#184f95,#104281,#0d366b;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --page: #0d0d0d; --surface: #1a1a19; --surface-2: #232321;
+    --ink: #f0efec; --ink-2: #c3c2b7; --muted: #898781;
+    --grid: #2c2c2a; --axis: #383835; --border: rgba(255,255,255,0.10);
+    --s1: #3987e5; --s2: #d95926; --s3: #199e70;
+    --other: #5c5b57; --nodata: #262624; --bar: #4a4945;
+    --good: #0ca30c; --warn-bg: #3a2f10;
+    --seq: #0d366b,#104281,#184f95,#1c5cab,#256abf,#2a78d6,#3987e5,#5598e7,#6da7ec,#86b6ef,#9ec5f4,#b7d3f6,#cde2fb;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --page: #0d0d0d; --surface: #1a1a19; --surface-2: #232321;
+  --ink: #f0efec; --ink-2: #c3c2b7; --muted: #898781;
+  --grid: #2c2c2a; --axis: #383835; --border: rgba(255,255,255,0.10);
+  --s1: #3987e5; --s2: #d95926; --s3: #199e70;
+  --other: #5c5b57; --nodata: #262624; --bar: #4a4945;
+  --good: #0ca30c; --warn-bg: #3a2f10;
+  --seq: #0d366b,#104281,#184f95,#1c5cab,#256abf,#2a78d6,#3987e5,#5598e7,#6da7ec,#86b6ef,#9ec5f4,#b7d3f6,#cde2fb;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--page); color: var(--ink); }
+body { font: 14px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif; }
+.num, td.n, .votes, .pct { font-variant-numeric: tabular-nums; }
+button { font: inherit; color: inherit; }
+
+/* Header */
+header.top {
+  position: sticky; top: 0; z-index: 20;
+  background: color-mix(in srgb, var(--page) 92%, transparent);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--border);
+  padding: 10px 16px;
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px 20px;
+}
+header h1 { font-size: 17px; margin: 0; font-weight: 650; letter-spacing: -0.01em; }
+header .sub { color: var(--ink-2); font-size: 12px; }
+.stats { display: flex; flex-wrap: wrap; gap: 4px 18px; margin-left: auto; align-items: baseline; }
+.stat { display: flex; flex-direction: column; }
+.stat b { font-size: 15px; font-weight: 650; font-variant-numeric: tabular-nums; }
+.stat span { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+.status { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--ink-2); padding: 3px 9px; border-radius: 999px; border: 1px solid var(--border); background: var(--surface); }
+.status i { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
+.status.live i { background: #0ca30c; box-shadow: 0 0 0 3px color-mix(in srgb, #0ca30c 25%, transparent); animation: pulse 2s infinite; }
+.status.stale i, .status.error i { background: var(--critical); }
+@keyframes pulse { 50% { box-shadow: 0 0 0 6px transparent; } }
+.banner { padding: 8px 16px; font-size: 13px; background: var(--warn-bg); border-bottom: 1px solid var(--border); }
+.banner.demo { background: var(--demo); color: #fff; font-weight: 600; text-align: center; }
+.banner[hidden] { display: none; }
+
+/* Layout */
+main {
+  display: grid; gap: 14px; padding: 14px 16px 32px;
+  grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr) minmax(0, 0.8fr);
+  grid-template-areas: "map ward city" "table table city" "school school school";
+  align-items: start;
+  max-width: 1800px; margin: 0 auto;
+}
+@media (max-width: 1280px) {
+  main { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-areas: "map map" "ward city" "table table" "school school"; }
+}
+@media (max-width: 760px) {
+  main { grid-template-columns: minmax(0, 1fr); grid-template-areas: "map" "ward" "city" "table" "school"; padding: 10px 12px 28px; }
+  .stats { margin-left: 0; }
+}
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; min-width: 0; }
+.card h2 { font-size: 13px; margin: 0; font-weight: 650; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-2); }
+.card-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; }
+.card-head .meta { color: var(--muted); font-size: 12px; margin-left: auto; font-variant-numeric: tabular-nums; }
+#mapCol { grid-area: map; align-self: stretch; }
+#wardCard { grid-area: ward; }
+#cityCol { grid-area: city; align-self: stretch; }
+#tableCard { grid-area: table; }
+#schoolCard { grid-area: school; }
+@media (min-width: 761px) { #mapCard { position: sticky; top: 72px; } }
+@media (min-width: 1281px) { #cityCard { position: sticky; top: 72px; max-height: calc(100vh - 86px); overflow: auto; } }
+
+/* Map */
+.modes { display: inline-flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; margin-left: auto; }
+.modes button { border: 0; background: transparent; padding: 5px 10px; font-size: 12px; cursor: pointer; color: var(--ink-2); }
+.modes button + button { border-left: 1px solid var(--border); }
+.modes button[aria-pressed="true"] { background: var(--ink); color: var(--surface); }
+.mapwrap { position: relative; }
+svg#map { width: 100%; height: auto; display: block; touch-action: manipulation; }
+svg#map .ward { stroke: var(--surface); stroke-width: 1.5; stroke-linejoin: round; cursor: pointer; transition: fill .35s, opacity .15s; outline: none; }
+svg#map.hovering .ward:not(.hot) { opacity: 0.55; }
+svg#map .hl { fill: none; stroke: var(--ink); stroke-width: 2.5; pointer-events: none; stroke-linejoin: round; }
+svg#map .pin { fill: none; stroke: var(--ink); stroke-width: 3.5; pointer-events: none; stroke-linejoin: round; }
+svg#map .lbl { font-size: 15px; font-weight: 650; text-anchor: middle; dominant-baseline: central; pointer-events: none; paint-order: stroke; stroke-width: 3px; stroke-linejoin: round; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 12px; color: var(--ink-2); margin-top: 8px; align-items: center; }
+.legend .sw { display: inline-block; width: 12px; height: 12px; border-radius: 3px; vertical-align: -2px; margin-right: 5px; }
+.legend .ramp { display: inline-flex; height: 10px; width: 140px; border-radius: 3px; overflow: hidden; vertical-align: -1px; margin: 0 6px; }
+.legend .ramp span { flex: 1; }
+.hint { font-size: 12px; color: var(--muted); margin-top: 6px; }
+
+/* Tooltip */
+#tip { position: fixed; z-index: 50; pointer-events: none; background: var(--surface); color: var(--ink); border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 6px 24px rgba(0,0,0,.18); padding: 9px 11px; font-size: 12px; width: 280px; opacity: 0; transition: opacity .1s; }
+#tip.on { opacity: 1; }
+#tip h3 { margin: 0 0 2px; font-size: 13px; }
+#tip .sec { margin-top: 7px; font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); display: flex; justify-content: space-between; }
+#tip .r { display: grid; grid-template-columns: 10px 1fr auto auto; gap: 6px; align-items: center; }
+#tip .r .votes { color: var(--ink-2); }
+#tip .r .pct { min-width: 44px; text-align: right; font-weight: 600; }
+
+/* Race lists */
+.ward-title { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.ward-title .wn { font-size: 22px; font-weight: 700; letter-spacing: -0.02em; }
+.ward-title .wname { font-size: 18px; font-weight: 650; }
+.ward-title .pinned { font-size: 11px; color: var(--muted); }
+.ward-sub { display: flex; flex-wrap: wrap; gap: 4px 16px; color: var(--ink-2); font-size: 12px; margin: 2px 0 10px; font-variant-numeric: tabular-nums; }
+.races { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px; }
+@media (max-width: 560px) { .races { grid-template-columns: minmax(0, 1fr); } }
+.race h3 { font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--ink-2); margin: 0 0 4px; display: flex; justify-content: space-between; gap: 8px; }
+.race h3 small { text-transform: none; letter-spacing: 0; color: var(--muted); font-weight: 400; font-variant-numeric: tabular-nums; }
+.cands { list-style: none; margin: 0; padding: 0; }
+.cand { display: grid; grid-template-columns: 8px minmax(0, 1fr) auto 46px; gap: 0 7px; align-items: center; padding: 3px 0; border-bottom: 1px solid var(--grid); position: relative; }
+.cand:last-child { border-bottom: 0; }
+.cand .sw { width: 8px; height: 8px; border-radius: 2px; background: transparent; }
+.cand .nm { overflow-wrap: anywhere; }
+.cand .votes { color: var(--ink-2); text-align: right; font-size: 13px; }
+.cand .pct { text-align: right; font-weight: 600; }
+.cand .bar { grid-column: 2 / 5; height: 3px; background: var(--grid); border-radius: 2px; overflow: hidden; margin-top: 2px; }
+.cand .bar i { display: block; height: 100%; background: var(--bar); border-radius: 0 2px 2px 0; transition: width .5s; }
+.cand.lead .nm { font-weight: 650; }
+.cand.lead .bar i { background: var(--ink-2); }
+.cand .delta { color: var(--good); font-size: 10px; display: block; line-height: 1; font-weight: 500; }
+.cand .tag { font-size: 10px; text-transform: uppercase; letter-spacing: .05em; border: 1px solid currentColor; border-radius: 4px; padding: 0 4px; margin-left: 6px; color: var(--good); vertical-align: 1px; }
+.cand.flash { animation: flash 1.6s ease-out; }
+@keyframes flash { from { background: color-mix(in srgb, #0ca30c 18%, transparent); } to { background: transparent; } }
+.dense .cand { padding: 2px 0; }
+.dense .cand .bar { height: 2px; }
+.empty { color: var(--muted); font-size: 13px; padding: 10px 0; }
+.lead-line { font-size: 12px; color: var(--ink-2); margin: 0 0 6px; }
+.lead-line b { color: var(--ink); }
+
+/* Ward table */
+.tblwrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th { text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); font-weight: 600; padding: 6px 8px; border-bottom: 1px solid var(--axis); white-space: nowrap; cursor: pointer; user-select: none; }
+th[aria-sort] { color: var(--ink); }
+th[aria-sort="ascending"]::after { content: " \25B2"; font-size: 9px; }
+th[aria-sort="descending"]::after { content: " \25BC"; font-size: 9px; }
+td { padding: 5px 8px; border-bottom: 1px solid var(--grid); white-space: nowrap; }
+td.n, th.n { text-align: right; font-variant-numeric: tabular-nums; }
+tbody tr { cursor: pointer; }
+tbody tr:hover, tbody tr.hot { background: var(--surface-2); }
+tbody tr.pinned { box-shadow: inset 3px 0 0 var(--ink); }
+.who { display: inline-flex; align-items: center; gap: 6px; }
+.who i { width: 9px; height: 9px; border-radius: 2px; display: inline-block; }
+.prog { display: inline-block; width: 46px; height: 5px; background: var(--grid); border-radius: 3px; overflow: hidden; vertical-align: 1px; margin-right: 6px; }
+.prog i { display: block; height: 100%; background: var(--ink-2); }
+.done { color: var(--good); font-weight: 600; }
+
+/* School boards */
+.boards { display: grid; gap: 16px; }
+.board h3 { margin: 0 0 6px; font-size: 13px; }
+.board-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 10px; }
+.board-ward { border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; }
+.board-ward h4 { margin: 0 0 4px; font-size: 12px; display: flex; justify-content: space-between; gap: 6px; }
+.board-ward h4 small { color: var(--muted); font-weight: 400; font-variant-numeric: tabular-nums; }
+details summary { cursor: pointer; }
+details > summary h2 { display: inline; }
+
+footer { color: var(--muted); font-size: 12px; padding: 0 16px 28px; max-width: 1800px; margin: 0 auto; }
+footer a { color: var(--ink-2); }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+</style>
+</head>
+<body>
+<div id="demoBanner" class="banner demo" hidden>DEMO DATA - randomly generated to preview the layout. These are NOT real results.</div>
+<header class="top">
+  <div>
+    <h1>Toronto 2026 Municipal Election</h1>
+    <div class="sub">Unofficial results - mayor, council and school trustees</div>
+  </div>
+  <span id="status" class="status"><i></i><span id="statusText">Loading...</span></span>
+  <div class="stats" id="stats"></div>
+</header>
+<div id="notice" class="banner" hidden></div>
+
+<main>
+  <div id="mapCol">
+  <section class="card" id="mapCard" aria-label="Ward map">
+    <div class="card-head">
+      <h2>Wards</h2>
+      <div class="modes" role="group" aria-label="Map colouring">
+        <button data-mode="mayor" aria-pressed="true">Mayor leader</button>
+        <button data-mode="council">Council margin</button>
+        <button data-mode="reporting">Reporting</button>
+        <button data-mode="turnout">Turnout</button>
+      </div>
+    </div>
+    <div class="mapwrap"><svg id="map" role="img" aria-label="Map of Toronto's 25 wards"></svg></div>
+    <div class="legend" id="legend"></div>
+    <div class="hint">Hover a ward to preview both races. Click to pin it.</div>
+  </section>
+  </div>
+
+  <section class="card" id="wardCard" aria-live="polite">
+    <div id="wardPanel"></div>
+  </section>
+
+  <div id="cityCol">
+  <section class="card" id="cityCard">
+    <div class="card-head"><h2>Mayor - city-wide</h2><span class="meta" id="cityMeta"></span></div>
+    <p class="lead-line" id="cityLead"></p>
+    <ul class="cands dense" id="cityList"></ul>
+  </section>
+  </div>
+
+  <section class="card" id="tableCard">
+    <div class="card-head"><h2>All wards</h2><span class="meta">Click a column to sort</span></div>
+    <div class="tblwrap"><table id="wardTable"></table></div>
+  </section>
+
+  <section class="card" id="schoolCard">
+    <div class="card-head"><h2>School board trustees</h2><span class="meta">Trustee wards differ from city wards</span></div>
+    <div class="boards" id="boards"></div>
+  </section>
+</main>
+
+<footer>
+  Source: City of Toronto unofficial results feeds
+  (<a href="https://mediaresults.toronto.ca/results/unofficialresult.json">all offices</a>,
+  <a href="https://mediaresults.toronto.ca/results/unofficialresult-wardbyward.json">mayor by ward</a>),
+  relayed every ~45 seconds because the City's feed does not allow cross-origin browser requests.
+  Results are unofficial until certified by the City Clerk. Advance-vote results are folded into ward totals on election night.
+  Ward boundaries: <a href="https://open.toronto.ca/dataset/city-wards/">Toronto Open Data</a>.
+  <span id="srcInfo"></span>
+</footer>
+
+<div id="tip" role="tooltip"></div>
+<script src="app.js"></script>
+</body>
+</html>
