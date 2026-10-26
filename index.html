@@ -649,6 +649,11 @@ body.watching .toast { bottom: 120px; }
 .tk-dot { width: 6px; height: 6px; border-radius: 50%; background: #fff; animation: tk-pulse 1.6s ease-in-out infinite; }
 @keyframes tk-pulse { 0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(255,255,255,.7); } 50% { opacity: .55; box-shadow: 0 0 0 3px rgba(255,255,255,0); } }
 @media (prefers-reduced-motion: reduce) { .tk-dot { animation: none; } }
+
+.lg-pick { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--ink-2); margin-right: 8px; }
+.lg-pick select { font: inherit; font-size: 12px; color: var(--ink); background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 2px 4px; max-width: 180px; }
+
+.save-map { margin-left: auto; font-size: 12px; }
 </style>
 </head>
 <body>
@@ -679,6 +684,7 @@ body.watching .toast { bottom: 120px; }
         <button id="findWardBtn" class="find-btn" type="button">Find my ward</button>
         <div class="modes" role="group" aria-label="Map colouring">
           <button data-mode="mayor" aria-pressed="true">Mayor leader</button>
+          <button data-mode="support" aria-pressed="false" title="Shade each ward by one mayoral candidate's share of the vote">Support</button>
           <button data-mode="council">Council margin</button>
           <button data-mode="reporting">Reporting</button>
           <button data-mode="turnout">Turnout</button>
@@ -790,6 +796,6 @@ body.watching .toast { bottom: 120px; }
 
 <div id="tip" role="tooltip"></div>
 <div id="callTip" role="tooltip"></div>
-<script src="app.js?v=20261026-tk2"></script>
+<script src="app.js?v=20261026-map1"></script>
 </body>
 </html>

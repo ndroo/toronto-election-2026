@@ -67,7 +67,8 @@
   let lastOk = 0, lastErr = null, apiBlockedUntil = 0, usedSource = null;
   const colorOf = new Map(); // mayoral candidate name -> slot (1..3); sticky so colours follow the person
   const hash = new URLSearchParams(location.hash.slice(1));
-  let mode = ['mayor', 'council', 'reporting', 'turnout'].includes(hash.get('m')) ? hash.get('m') : 'mayor';
+  let mode = ['mayor', 'support', 'council', 'reporting', 'turnout'].includes(hash.get('m')) ? hash.get('m') : 'mayor';
+  let supportOf = null; // "Support" map mode: whose share of the mayor vote to shade (defaults to the city-wide leader)
   // Device-only memory: the ward found from location, and the last ward viewed. No coordinates are kept.
   const store = {
     get: (k) => { try { return localStorage.getItem(k); } catch { return null; } },
@@ -540,7 +541,8 @@
     svg.addEventListener('focusin', (e) => { const n = e.target.dataset?.w; if (n) { setHover(n); const r = e.target.getBoundingClientRect(); placeTip(r.right, r.top); } });
     svg.addEventListener('focusout', () => setHover(null));
     svg.addEventListener('keydown', (e) => { const n = e.target.dataset?.w; if (n && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); setPinned(n); setTab('ward'); } });
-    $('.modes').addEventListener('click', (e) => { const m = e.target.dataset?.mode; if (m) { mode = m; saveHash(); renderMap(); } });
+    $('#legend').addEventListener('change', (e) => { if (e.target.id === 'supportPick') { supportOf = e.target.value; renderMap(); } });
+  $('.modes').addEventListener('click', (e) => { const m = e.target.dataset?.mode; if (m) { mode = m; saveHash(); renderMap(); } });
   }
 
   const seqRamp = () => css('--seq').split(',').map((s) => s.trim());
@@ -555,6 +557,10 @@
       if (r.tied) return css('--other');
       const c = candColour(r.leader.name) || css('--other');
       return mix(c, css('--surface'), 0.35 + 0.65 * clamp(r.margin / 30));
+    }
+    if (mode === 'support') {
+      const c = w.mayor?.cands.find((x) => x.name === supportName());
+      return c && w.mayor.votes ? seqColour(c.pct / supportMax()) : nodata;
     }
     if (mode === 'council') {
       const r = w.council;
@@ -571,6 +577,9 @@
     }
   }
 
+  const supportName = () => supportOf || model?.mayor.cands[0]?.name;
+  // Shade relative to the candidate's best ward, so where they're strong stands out even at low shares.
+  const supportMax = () => Math.max(1, ...Object.values(model?.wards || {}).map((w) => w.mayor?.cands.find((x) => x.name === supportName())?.pct || 0));
   function renderMap() {
     for (const b of document.querySelectorAll('.modes button')) b.setAttribute('aria-pressed', String(b.dataset.mode === mode));
     for (const [num, p] of Object.entries(paths)) p.style.fill = wardFill(model?.wards[num]);
@@ -632,6 +641,10 @@
     } else if (mode === 'council') {
       key = ramp('0', '40+ pts', "Council leader's lead over 2nd place");
       note = '<span class="lg-faces"><i class="lf pend"></i>Not called <i class="lf proj">&#10003;</i>Projected <i class="lf won">&#10003;</i>Winner</span>';
+    } else if (mode === 'support') {
+      const opts = (model?.mayor.cands || []).slice(0, 15).map((c) => `<option${c.name === supportName() ? ' selected' : ''}>${esc(c.name)}</option>`).join('');
+      key = `<label class="lg-pick">Candidate <select id="supportPick">${opts}</select></label>${model?.mayor.votes ? ramp('0%', pct(supportMax(), 0), 'share of the mayor vote in each ward') : '<span>No votes yet</span>'}`;
+      note = 'Shaded up to their best ward';
     } else if (mode === 'reporting') {
       key = ramp('0%', '100%', 'Polls reporting');
       note = 'Stronger colour = more counted';
@@ -642,7 +655,7 @@
     $('#legend').innerHTML = `<div class="lg-row">${key}</div>
       <div class="lg-row lg-note">${sw(css('--nodata'), 'No votes yet')}<span>${note}</span>
         <label class="lg-toggle"${mode === 'mayor' || mode === 'council' ? '' : ' hidden'}><input type="checkbox" id="facesToggle"${showFaces ? ' checked' : ''}> Faces</label>
-        <span>Hover to preview · click to pin</span></div>`;
+        <span>Hover to preview · click to pin</span><button type="button" class="linkish save-map" id="saveMap">Save map image</button></div>`;
   }
 
   $('#legend').addEventListener('change', (e) => {
@@ -1491,6 +1504,67 @@
     : '<svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="12" cy="3.5" r="2" fill="currentColor"/><circle cx="4" cy="8" r="2" fill="currentColor"/><circle cx="12" cy="12.5" r="2" fill="currentColor"/><path d="M10.2 4.5 5.8 7M5.8 9l4.4 2.5" stroke="currentColor" stroke-width="1.4"/></svg>';
   let toastTimer;
   const toast = (msg) => { const t = $('#toast'); t.textContent = msg; t.classList.add('on'); clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('on'), 2200); };
+  // Save the map as a PNG: the current colouring, a title, the count so far, a key and the address.
+  // Phones get the native share sheet with the image; elsewhere it downloads.
+  const MODE_TITLE = { mayor: 'Mayor: who leads each ward', council: "Council: leader's margin", reporting: 'Polls reporting', turnout: 'Turnout' };
+  async function saveMapImage() {
+    const W = 1200, H = 1000, pad = 48, st = getComputedStyle(document.documentElement);
+    const v = (n) => st.getPropertyValue(n).trim();
+    const map = document.createElementNS(NS, 'svg');
+    map.setAttribute('xmlns', NS); map.setAttribute('viewBox', `0 0 ${geo.w} ${geo.h}`); map.setAttribute('width', geo.w); map.setAttribute('height', geo.h);
+    for (const p of Object.values(paths)) {
+      const q = document.createElementNS(NS, 'path');
+      q.setAttribute('d', p.getAttribute('d')); q.setAttribute('fill', p.style.fill || v('--nodata'));
+      q.setAttribute('stroke', v('--surface')); q.setAttribute('stroke-width', '1.5'); q.setAttribute('stroke-linejoin', 'round');
+      map.appendChild(q);
+    }
+    for (const t of svg.querySelectorAll('.lbl')) {
+      const c = t.cloneNode(true);
+      c.removeAttribute('style'); c.setAttribute('fill', v('--ink')); c.setAttribute('stroke', v('--surface')); c.setAttribute('stroke-width', '3');
+      c.setAttribute('paint-order', 'stroke'); c.setAttribute('font-family', 'system-ui, -apple-system, sans-serif'); c.setAttribute('font-weight', '700');
+      map.appendChild(c);
+    }
+    const img = new Image();
+    img.src = URL.createObjectURL(new Blob([new XMLSerializer().serializeToString(map)], { type: 'image/svg+xml' }));
+    await img.decode();
+    const cv = document.createElement('canvas'); cv.width = W * 2; cv.height = H * 2;
+    const g = cv.getContext('2d'); g.scale(2, 2);
+    g.fillStyle = v('--surface'); g.fillRect(0, 0, W, H);
+    const font = (w, px) => `${w} ${px}px system-ui, -apple-system, "Segoe UI", sans-serif`;
+    g.fillStyle = v('--ink'); g.font = font(700, 34); g.fillText('Toronto 2026 election results', pad, pad + 26);
+    g.font = font(600, 22); g.fillStyle = v('--ink-2');
+    g.fillText(mode === 'support' ? `Mayor: ${supportName()}'s share of the vote by ward` : MODE_TITLE[mode], pad, pad + 62);
+    const r = model?.mayor;
+    g.font = font(400, 17); g.fillStyle = v('--muted');
+    g.fillText(`Unofficial · ${r ? `${fmt(r.pollsReceived)} of ${fmt(r.polls)} polls reporting · ` : ''}${new Date().toLocaleString('en-CA', { timeZone: TZ, month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}`, pad, pad + 92);
+    const top = pad + 120, mapH = H - top - 110, scale = Math.min((W - pad * 2) / geo.w, mapH / geo.h);
+    g.drawImage(img, (W - geo.w * scale) / 2, top, geo.w * scale, geo.h * scale);
+    URL.revokeObjectURL(img.src);
+    let x = pad; const ky = H - 72;
+    g.font = font(500, 16);
+    const swatch = (col, label) => { g.fillStyle = col; g.fillRect(x, ky - 13, 16, 16); g.fillStyle = v('--ink-2'); g.fillText(label, x + 22, ky); x += 22 + g.measureText(label).width + 20; };
+    if (mode === 'mayor') { for (const [n, sl] of [...colorOf.entries()].sort((a, b) => a[1] - b[1])) swatch(v(`--s${sl}`), n); swatch(v('--other'), 'Other / tied'); }
+    else {
+      const lo = $('#legend .lo')?.textContent || '', hi = $('#legend .hi')?.textContent || '';
+      g.fillStyle = v('--ink-2'); g.fillText(lo, x, ky); x += g.measureText(lo).width + 8;
+      seqRamp().forEach((c, i) => { g.fillStyle = c; g.fillRect(x + i * 18, ky - 13, 18, 16); }); x += seqRamp().length * 18 + 8;
+      g.fillStyle = v('--ink-2'); g.fillText(hi, x, ky);
+    }
+    g.font = font(500, 15); g.fillStyle = v('--muted');
+    g.fillText('ndroo.github.io/toronto-election-2026 · City of Toronto unofficial results', pad, H - 30);
+    const blob = await new Promise((res) => cv.toBlob(res, 'image/png'));
+    const name = `toronto-2026-${mode === 'support' ? `support-${supportName().toLowerCase().replace(/\W+/g, '-')}` : mode}.png`;
+    const file = new File([blob], name, { type: 'image/png' });
+    if (matchMedia('(hover: none)').matches && navigator.canShare?.({ files: [file] })) {
+      try { await navigator.share({ files: [file], title: 'Toronto 2026 election results' }); } catch {}
+      return;
+    }
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+    toast('Map image saved');
+  }
+  $('#legend').addEventListener('click', (e) => { if (e.target.id === 'saveMap') saveMapImage().catch((err) => { console.warn('[map image]', err); toast("Couldn't make the image"); }); });
   $('#shareBtn').setAttribute('aria-label', 'Share this page'); $('#shareBtn').title = 'Share this page';
   $('#shareBtn').addEventListener('click', async () => {
     const data = { title: 'Toronto 2026 Election Results', text: 'Live Toronto election results, ward by ward. Ad-free.', url: SHARE_URL };
