@@ -835,7 +835,8 @@
       else {
         const ms = POLLS_CLOSE - Date.now();
         st.classList.add('waiting');
-        tx.textContent = ms > 0 ? `Polls close in ${Math.floor(ms / 3600e3)}h ${Math.floor((ms % 3600e3) / 60e3)}m` : 'Polls closed · waiting for first results';
+        const p2 = (n) => String(n).padStart(2, '0');
+        tx.textContent = ms > 0 ? `Polls close in ${Math.floor(ms / 3600e3)}h ${p2(Math.floor((ms % 3600e3) / 60e3))}m ${p2(Math.floor((ms % 60e3) / 1000))}s` : 'Polls closed · waiting for first results';
       }
       st.title = `Feed generated ${gen}`;
       if (usedSource === 'raw') note = 'GitHub API limit reached for your network - using a backup copy that can lag up to 5 minutes.';

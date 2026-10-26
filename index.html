@@ -97,7 +97,7 @@ td .meter { margin-top: 3px; }
 .status i { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
 .status.live i { background: #0ca30c; box-shadow: 0 0 0 3px color-mix(in srgb, #0ca30c 25%, transparent); animation: pulse 2s infinite; }
 .status.stale i, .status.error i { background: var(--critical); }
-.status { font-family: inherit; cursor: default; }
+.status { font-family: inherit; cursor: default; font-variant-numeric: tabular-nums; }
 .status.waiting { cursor: pointer; }
 .status.waiting i { background: var(--proj); }
 .status.loading i { animation: pulse-dim 1.2s ease-in-out infinite; }
