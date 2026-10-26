@@ -378,7 +378,7 @@
       w.pollsReceived = String(Math.min(int(w.polls), Math.round(int(w.polls) * clamp(p + (rnd(key.replace(/^\w+\|/, '')) - 0.5) * 0.3))));
       const cast = Math.round(int(w.totalVoters) * 0.33 * (int(w.pollsReceived) / Math.max(1, int(w.polls))));
       // Swings that fade as counting finishes, so close candidates trade places now and then.
-      const ws = cands.map((c) => weight(c.name, key) * (1 + 0.35 * (1 - p) * Math.sin(demoTick * 1.1 + rnd(c.name + key) * 6.28))), tot = ws.reduce((a, x) => a + x, 0);
+      const ws = cands.map((c) => weight(c.name, key) * (1 + (hasPhoto(c.name) ? 0.12 : 0) * (1 - p) * Math.sin(demoTick * 1.1 + rnd(c.name + key) * 6.28))), tot = ws.reduce((a, x) => a + x, 0);
       cands.forEach((c, i) => {
         const k = `${key}|${c.name}`;
         const v = Math.max(demoPrev.get(k) || 0, Math.round((cast * ws[i]) / tot));
@@ -863,6 +863,14 @@
       if (motion && before != null && before !== now && el.offsetParent) el.innerHTML = rollHTML(before, now, startFor(el));
     }
     if (!motion) return;
+    // New-vote deltas ("+123") arrive with their row's turn in the stream, just ahead of the digits rolling.
+    for (const el of document.querySelectorAll('.cand .delta')) {
+      if (!el.textContent || !el.offsetParent) continue;
+      el.animate([
+        { opacity: 0, transform: 'translateX(10px)', filter: 'blur(3px)' },
+        { opacity: 1, transform: 'translateX(0)', filter: 'blur(0)' },
+      ], { duration: 650, delay: Math.max(0, startFor(el) - 150), easing: 'cubic-bezier(.2,.8,.2,1)', fill: 'backwards' });
+    }
     for (const el of document.querySelectorAll('[data-bk]')) {
       const before = snap.bars.get(el.dataset.bk);
       if (before && before !== el.style.width) {
@@ -876,8 +884,19 @@
       if (Math.abs(dy) < 2) continue;
       // Rows climbing the list pass over the ones they overtake; each waits in its old spot until its turn.
       el.style.position = 'relative'; el.style.zIndex = dy > 0 ? '2' : '1'; el.style.background = 'var(--surface)';
-      el.animate([{ transform: `translateY(${dy}px)`, boxShadow: '0 6px 18px rgba(0,0,0,.14)' }, { transform: 'translateY(0)', boxShadow: '0 0 0 rgba(0,0,0,0)' }],
-        { duration: MOVE_MS, delay: (rowStart.get(el.dataset.fk) ?? startFor(el)) + ROLL_PHASE_MS, easing: EASE, fill: 'backwards' }).onfinish = () => { el.style.zIndex = ''; el.style.background = ''; };
+      // Tinted by direction (green climbing, red dropping). The tint fades in while the row's numbers roll,
+      // holds while it slides to its new place, then fades out after it lands.
+      const surface = css('--surface');
+      const tint = mix(dy > 0 ? '#0ca30c' : '#d03b3b', surface, 0.2);
+      const shadow = '0 6px 18px rgba(0,0,0,.14)', none = '0 0 0 rgba(0,0,0,0)';
+      const FADE_MS = 1100, total = ROLL_PHASE_MS + MOVE_MS + FADE_MS;
+      el.animate([
+        { transform: `translateY(${dy}px)`, background: surface, boxShadow: none },
+        { offset: ROLL_PHASE_MS / total, transform: `translateY(${dy}px)`, background: tint, boxShadow: shadow, easing: EASE },
+        { offset: (ROLL_PHASE_MS + MOVE_MS) / total, transform: 'translateY(0)', background: tint, boxShadow: none },
+        { transform: 'translateY(0)', background: surface, boxShadow: none },
+      ], { duration: total, delay: rowStart.get(el.dataset.fk) ?? startFor(el), fill: 'backwards' })
+        .onfinish = () => { el.style.zIndex = ''; el.style.background = ''; };
     }
   }
 
