@@ -359,7 +359,9 @@
     throw lastErr || new Error('No data source available');
   }
 
-  let demoP = 0.08, demoTick = 0;
+  // Simulated election night: counting starts at zero, arrives in uneven batches, holds on the final
+  // result for a few updates, then quietly starts over.
+  let demoP = 0, demoTick = 0, demoHold = 0, demoPaused = false, demoQuiet = false;
   const demoPrev = new Map();
   function demoize(b) {
     // Synthetic numbers on the real candidate lists - layout preview only.
@@ -389,7 +391,9 @@
       cands.sort((a, b) => int(b.votesReceived) - int(a.votesReceived));
     };
     demoTick++;
-    const p = (demoP = Math.min(1, demoP + 0.04));
+    if (demoP >= 1 && ++demoHold > 2) { demoP = 0; demoHold = 0; demoPrev.clear(); odoPrev.clear(); deltaPrev.clear(); demoQuiet = true; }
+    else if (demoTick > 1 && demoP < 1) demoP = Math.min(1, demoP + 0.015 + Math.random() * 0.055);
+    const p = demoP;
     const d = structuredClone(b);
     for (const o of d.all.office) for (const w of o.ward) fill(w, w.candidate, `${o.id}|${w.num}`, p);
     // Rebuild the mayor-by-ward file from the per-ward fill so the two agree.
@@ -418,11 +422,14 @@
   let rawBundle = null;
   async function tick() {
     try {
+      if (DEMO && demoPaused && model) return;
       if (!DEMO || !rawBundle) rawBundle = await fetchBundle();
       model = buildModel(DEMO ? demoize(rawBundle) : rawBundle);
       lastOk = Date.now(); lastErr = null;
       assignColours();
-      renderAll();
+      renderAll(demoQuiet);
+      demoQuiet = false;
+      if (DEMO) $('#demoProg').textContent = `Simulated count: ${Math.round((model.mayor.pollsReceived / model.mayor.polls) * 100)}% of polls in`;
       maybeWelcome();
       renderWelcome();
     } catch (e) {
@@ -463,6 +470,9 @@
     pin = document.createElementNS(NS, 'path'); pin.setAttribute('class', 'pin');
     hl = document.createElementNS(NS, 'path'); hl.setAttribute('class', 'hl');
     faceLayer = document.createElementNS(NS, 'g'); faceLayer.setAttribute('class', 'faces');
+    const defs = document.createElementNS(NS, 'defs');
+    defs.innerHTML = '<filter id="desat"><feColorMatrix type="saturate" values="0.1"/></filter>';
+    svg.append(defs);
     svg.append(gW, pin, hl, faceLayer, gL);
     // Face size scales with the ward's footprint so small downtown wards don't overflow.
     for (const [num, p] of Object.entries(paths)) { const b = p.getBBox(); wardSize[num] = Math.sqrt(b.width * b.height); }
@@ -533,14 +543,24 @@
       if (!a) { lbl.setAttribute('y', g.ly); lbl.classList.remove('small'); continue; }
       const r1 = clamp(wardSize[num] * 0.15, 16, 28);
       const faces = [{ c: a, ph: pa, rad: r1, x: g.lx, y: g.ly, lead: true }];
+      // Council view: the face also shows the state of the race. Faded = not called, blue + ◆ = projected,
+      // green + ✓ = settled. (The mayor's race is only called city-wide, so mayor faces stay plain.)
+      const st = mode === 'council' ? r.call?.status : null;
+      const settled = st === 'decided' || st === 'official' || st === 'acclaimed';
+      const pending = mode === 'council' && !settled && st !== 'projected';
       for (const f of faces) {
-        const ring = mode === 'mayor' ? (candColour(f.c.name) || css('--other')) : css(f.lead ? '--ink' : '--surface');
+        const ring = mode === 'mayor' ? (candColour(f.c.name) || css('--other'))
+          : settled ? css('--good-fill') : st === 'projected' ? css('--proj') : css('--axis');
         const id = `fc${clipId++}`;
-        parts.push(`<g class="face"><title>${esc(f.c.name)} ${pct(f.c.pct)}</title>
-          <circle cx="${f.x}" cy="${f.y}" r="${f.rad + 2.5}" fill="${ring}"/>
+        const badge = settled || st === 'projected'
+          ? `<circle cx="${f.x + f.rad * 0.74}" cy="${f.y + f.rad * 0.74}" r="${f.rad * 0.42}" fill="${ring}" stroke="${css('--surface')}" stroke-width="1.5"/>
+             <text x="${f.x + f.rad * 0.74}" y="${f.y + f.rad * 0.76}" class="face-badge" style="font-size:${f.rad * 0.5}px">${settled ? '&#10003;' : '&#9670;'}</text>` : '';
+        parts.push(`<g class="face${pending ? ' pending' : ''}"><title>${esc(f.c.name)} ${pct(f.c.pct)}${st ? ` - ${CALL_LABEL[st].replace(/&[^;]+;\s*/g, '')}` : ''}</title>
+          <circle cx="${f.x}" cy="${f.y}" r="${f.rad + 2.5}" fill="${pending ? css('--surface') : ring}"${pending ? ` stroke="${ring}" stroke-width="1.5" stroke-dasharray="3 2.5"` : ''}/>
           ${f.ph ? `<clipPath id="${id}"><circle cx="${f.x}" cy="${f.y}" r="${f.rad}"/></clipPath>
-          <image href="photos/${f.ph.f}" x="${f.x - f.rad}" y="${f.y - f.rad}" width="${f.rad * 2}" height="${f.rad * 2}" clip-path="url(#${id})" preserveAspectRatio="xMidYMid slice"/>`
-          : `<circle cx="${f.x}" cy="${f.y}" r="${f.rad}" class="face-i"/><text x="${f.x}" y="${f.y}" class="face-t" style="font-size:${f.rad * 0.62}px">${esc(initials(f.c.name))}</text>`}</g>`);
+          <image href="photos/${f.ph.f}" x="${f.x - f.rad}" y="${f.y - f.rad}" width="${f.rad * 2}" height="${f.rad * 2}" clip-path="url(#${id})" preserveAspectRatio="xMidYMid slice"${pending ? ' filter="url(#desat)" opacity=".7"' : ''}/>`
+          : `<circle cx="${f.x}" cy="${f.y}" r="${f.rad}" class="face-i"/><text x="${f.x}" y="${f.y}" class="face-t" style="font-size:${f.rad * 0.62}px">${esc(initials(f.c.name))}</text>`}
+          ${badge}</g>`);
       }
       lbl.setAttribute('y', g.ly + r1 + 11); lbl.classList.add('small');
     }
@@ -558,7 +578,7 @@
       note = 'Darker = wider lead';
     } else if (mode === 'council') {
       key = ramp('0', '40+ pts', "Council leader's lead over 2nd place");
-      note = 'Darker = safer seat';
+      note = '<span class="lg-faces"><i class="lf pend"></i>Not called <i class="lf proj">&#9670;</i>Projected <i class="lf won">&#10003;</i>Winner</span>';
     } else if (mode === 'reporting') {
       key = ramp('0%', '100%', 'Polls reporting');
       note = 'Darker = more counted';
@@ -681,12 +701,24 @@
           <span>${fmt(rep.totalVoters)} electors</span>` : ''}</div>
       </div>
       <div class="races">
-        <div class="race"><div class="race-head"><h3>Council</h3><span class="meta">${raceMeta(w.council)}</span></div>${callRow(w.council)}
+        <div class="race"><div class="race-head"><h3>Council · Ward ${n}</h3><span class="meta">${raceMeta(w.council)}</span></div>
+          <div class="race-sum">${callRow(w.council)}</div>
           <div class="scroller"><ul class="cands">${candList(w.council)}</ul></div></div>
-        <div class="race"><div class="race-head"><h3>Mayor</h3><span class="meta">${raceMeta(w.mayor)}</span></div><div class="call-why">Votes cast in this ward. The mayor's race is called city-wide.</div>
-          <div class="scroller"><ul class="cands dense">${candList(w.mayor, { colour: true, showCall: false })}</ul></div></div>
+        <div class="race"><div class="race-head"><h3>Mayor · votes in Ward ${n}</h3><span class="meta">${raceMeta(w.mayor)}</span></div>
+          <div class="race-sum">${wardMayorSummary(w.mayor)}</div>
+          <div class="scroller"><ul class="cands">${candList(w.mayor, { colour: true, showCall: false })}</ul></div></div>
       </div>`;
     el.querySelectorAll('.scroller').forEach((x, i) => { if (keep[i]) x.scrollTop = keep[i]; });
+  }
+
+  // Same shape as the council summary, so both columns line up, but scoped to this ward and never a call.
+  function wardMayorSummary(r) {
+    const [a, b] = r?.cands || [];
+    const txt = !r?.leader ? 'No votes counted in this ward yet'
+      : r.tied ? `<b>${esc(a.name)}</b> and <b>${esc(b.name)}</b> are tied in this ward`
+      : `<b>${esc(a.name)}</b> leads ${esc(b?.name || '')} in this ward by <b>${fmt(a.votes - (b?.votes || 0))}</b> votes`;
+    return `<div class="callrow"><span class="scope-pill">This ward only</span><span class="lead-txt">${txt}</span></div>
+      <div class="call-why">The mayor's race is called on the city-wide count (left), not ward by ward.</div>`;
   }
 
   function renderCity() {
@@ -821,6 +853,7 @@
   // and bars grow from their previous length. Hover re-renders never animate.
   const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)');
   const odoPrev = new Map();
+  const deltaPrev = new Map(); // row key -> last "+N" shown
   const EASE = 'cubic-bezier(.45,0,.25,1.04)'; // slow start, gentle settle: easy to follow by eye
   const MOVE_MS = 1600;
   function snapshot() {
@@ -846,8 +879,8 @@
   // in turn (bars grow with them), and a row that changed place slides only after its own numbers settle.
   const ROLL_PHASE_MS = 1300; // time for a row's digits to finish turning
   const STREAM_STEP_MS = 70, STREAM_MAX_MS = 3000;
-  function animateChanges(snap) {
-    const motion = !reduceMotion.matches;
+  function animateChanges(snap, quiet = false) {
+    const motion = !reduceMotion.matches && !quiet;
     const rowStart = new Map(); // row key -> when its numbers start rolling
     let step = 0;
     const startFor = (el) => {
@@ -862,14 +895,27 @@
       odoPrev.set(k, now);
       if (motion && before != null && before !== now && el.offsetParent) el.innerHTML = rollHTML(before, now, startFor(el));
     }
-    if (!motion) return;
-    // New-vote deltas ("+123") arrive with their row's turn in the stream, just ahead of the digits rolling.
+    if (!motion) {
+      for (const el of document.querySelectorAll('.cand .delta')) { const row = el.closest('[data-fk]')?.dataset.fk; if (row) deltaPrev.set(row, el.textContent); }
+      return;
+    }
+    // New-vote deltas ("+123"): the previous figure stays until the row's turn in the stream, then
+    // crossfades to the new one (or fades away if the row got no new votes).
     for (const el of document.querySelectorAll('.cand .delta')) {
-      if (!el.textContent || !el.offsetParent) continue;
-      el.animate([
+      const row = el.closest('[data-fk]')?.dataset.fk;
+      if (!row) continue;
+      const now = el.textContent, before = deltaPrev.get(row) || '';
+      deltaPrev.set(row, now);
+      if (!el.offsetParent || before === now) continue;
+      el.innerHTML = `<span class="dl">${esc(before)}</span><span class="dl">${esc(now)}</span>`;
+      const [oldEl, newEl] = el.children;
+      const t = Math.max(0, startFor(el) - 150);
+      oldEl.animate([{ opacity: 1, transform: 'translateY(0)' }, { opacity: 0, transform: 'translateY(-8px)' }],
+        { duration: 450, delay: t, easing: 'cubic-bezier(.4,0,.6,1)', fill: 'both' });
+      if (now) newEl.animate([
         { opacity: 0, transform: 'translateX(10px)', filter: 'blur(3px)' },
         { opacity: 1, transform: 'translateX(0)', filter: 'blur(0)' },
-      ], { duration: 650, delay: Math.max(0, startFor(el) - 150), easing: 'cubic-bezier(.2,.8,.2,1)', fill: 'backwards' });
+      ], { duration: 650, delay: t + 200, easing: 'cubic-bezier(.2,.8,.2,1)', fill: 'backwards' });
     }
     for (const el of document.querySelectorAll('[data-bk]')) {
       const before = snap.bars.get(el.dataset.bk);
@@ -900,12 +946,12 @@
     }
   }
 
-  function renderAll() {
+  function renderAll(quiet = false) {
     const snap = snapshot();
     flashNow = true;
     renderStatus(); renderStats(); renderMap(); renderCity(); renderWard(); renderTable(); renderBoards(); renderTip();
     flashNow = false;
-    animateChanges(snap);
+    animateChanges(snap, quiet);
   }
 
   // ---------- welcome dialog ----------
@@ -965,7 +1011,11 @@
   $('#status').addEventListener('click', () => { if (!hasResults()) openWelcome(); });
 
   // ---------- boot ----------
-  if (DEMO) $('#demoBanner').hidden = false;
+  if (DEMO) {
+    $('#demoBanner').hidden = false;
+    $('#demoPause').addEventListener('click', (e) => { demoPaused = !demoPaused; e.target.textContent = demoPaused ? 'Resume' : 'Pause'; });
+    $('#demoRestart').addEventListener('click', () => { demoP = 0; demoHold = 0; demoTick = 0; demoPrev.clear(); odoPrev.clear(); deltaPrev.clear(); demoQuiet = true; demoPaused = false; $('#demoPause').textContent = 'Pause'; tick(); });
+  }
   matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => model && renderAll());
   Promise.all([
     fetch('wards.json').then((r) => r.json()),

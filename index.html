@@ -157,6 +157,13 @@ svg#map.hovering .face { opacity: .5; }
 svg#map .face-i { fill: var(--surface-2); }
 svg#map .face-t { fill: var(--ink-2); font-weight: 700; text-anchor: middle; dominant-baseline: central; }
 svg#map .lbl.small { font-size: 11px; }
+svg#map .face-badge { fill: #fff; font-weight: 700; text-anchor: middle; dominant-baseline: central; }
+.lg-faces { display: inline-flex; align-items: center; gap: 4px; }
+.lg-faces .lf { display: inline-grid; place-items: center; width: 13px; height: 13px; border-radius: 50%; font-size: 8px; font-style: normal; color: #fff; margin-left: 6px; }
+.lg-faces .lf:first-child { margin-left: 0; }
+.lg-faces .pend { border: 1.5px dashed var(--axis); background: var(--surface-2); }
+.lg-faces .proj { background: var(--proj); }
+.lg-faces .won { background: var(--good-fill); }
 svg#map .lbl { font-size: 15px; font-weight: 650; text-anchor: middle; dominant-baseline: central; pointer-events: none; paint-order: stroke; stroke-width: 3px; stroke-linejoin: round; }
 .legend { font-size: 12px; color: var(--ink-2); margin-top: 8px; }
 .lg-row { display: flex; gap: 6px 14px; align-items: center; height: 20px; white-space: nowrap; overflow: hidden; }
@@ -210,6 +217,8 @@ svg#map .lbl { font-size: 15px; font-weight: 650; text-anchor: middle; dominant-
 .cand .votes { color: var(--ink-2); text-align: right; font-size: 13px; }
 .cand .pct { text-align: right; font-weight: 600; }
 .cand .delta { color: var(--good); font-size: 11px; text-align: right; font-variant-numeric: tabular-nums; }
+.cand .delta { display: grid; justify-items: end; }
+.cand .delta .dl { grid-area: 1 / 1; }
 .cand .bar { grid-column: 2 / -1; height: 3px; background: var(--grid); border-radius: 2px; overflow: hidden; margin-top: 3px; }
 .cand .bar i { display: block; height: 100%; background: var(--bar); border-radius: 0 2px 2px 0; transition: width .5s; }
 .cand.lead .nm { font-weight: 650; }
@@ -278,6 +287,8 @@ td .sub2 { color: var(--muted); font-size: 11px; margin-top: 1px; font-variant-n
 .call-projected { background: var(--proj); color: #fff; border-color: var(--proj); }
 .call-decided, .call-official, .call-acclaimed { background: var(--good-fill); color: #fff; border-color: var(--good-fill); }
 .call-official { box-shadow: 0 0 0 3px color-mix(in srgb, var(--good-fill) 28%, transparent); }
+.race-sum { min-height: 76px; flex: none; }
+.scope-pill { display: inline-flex; align-items: center; height: 22px; padding: 0 8px; border-radius: 999px; border: 1px dashed var(--axis); color: var(--muted); font: 650 11px/1 system-ui, -apple-system, "Segoe UI", sans-serif; white-space: nowrap; flex: none; }
 .callrow { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; margin: 6px 0 0; min-width: 0; }
 .callrow .lead-txt { font-size: 12.5px; color: var(--ink-2); line-height: 1.35; }
 .callrow .lead-txt b { color: var(--ink); }
@@ -348,6 +359,9 @@ footer.disclaimer a, footer.disclaimer .linkish { color: var(--ink-2); font-size
 .btn.primary { background: var(--ink); color: var(--surface) !important; border-color: var(--ink); }
 .btn.primary:hover { filter: brightness(1.15); }
 .welcome-fine { font-size: 11.5px; color: var(--muted) !important; margin: 12px 0 0 !important; }
+.banner.demo #demoProg { margin: 0 6px 0 10px; font-variant-numeric: tabular-nums; }
+.demo-btn { margin-left: 6px; border: 1px solid rgba(255,255,255,.7); background: transparent; color: #fff; border-radius: 999px; padding: 2px 10px; font: 600 12px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif; cursor: pointer; }
+.demo-btn:hover { background: rgba(255,255,255,.15); }
 .banner.demo .demo-exit { color: #fff; margin-left: 10px; text-decoration: underline; }
 
 /* About */
@@ -364,7 +378,9 @@ footer.disclaimer a, footer.disclaimer .linkish { color: var(--ink-2); font-size
 </style>
 </head>
 <body>
-<div id="demoBanner" class="banner demo" hidden>DEMO DATA - randomly generated to preview the layout. These are NOT real results. <a href="./" class="demo-exit">Back to live results &rarr;</a></div>
+<div id="demoBanner" class="banner demo" hidden>DEMO DATA - simulated election night, NOT real results. <span id="demoProg"></span>
+  <button id="demoPause" class="demo-btn" type="button">Pause</button><button id="demoRestart" class="demo-btn" type="button">Restart</button>
+  <a href="./" class="demo-exit">Back to live results &rarr;</a></div>
 <header class="top">
   <div>
     <h1>Toronto 2026 Municipal Election</h1>
@@ -449,6 +465,6 @@ footer.disclaimer a, footer.disclaimer .linkish { color: var(--ink-2); font-size
 
 <div id="tip" role="tooltip"></div>
 <div id="callTip" role="tooltip"></div>
-<script src="app.js?v=20261026f"></script>
+<script src="app.js?v=20261026i"></script>
 </body>
 </html>
