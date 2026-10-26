@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
+<script>try { const t = localStorage.getItem('theme'); if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t; } catch {}</script>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Toronto 2026 Election Results</title>
 <meta name="description" content="Live unofficial results for Toronto mayor, city council and school trustees, by ward, from the City of Toronto media feed.">
@@ -104,6 +105,8 @@ td .meter { margin-top: 3px; }
 @keyframes pulse-dim { 50% { opacity: .3; } }
 .about-btn { border: 1px solid var(--border); background: var(--surface); color: var(--ink-2); border-radius: 999px; padding: 3px 11px; font: 600 12px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif; cursor: pointer; }
 .about-btn:hover { color: var(--ink); background: var(--surface-2); }
+.theme-btn { display: inline-flex; align-items: center; gap: 5px; }
+.theme-btn svg { width: 13px; height: 13px; flex: none; }
 .skeleton { display: grid; gap: 10px; padding: 4px 0; list-style: none; }
 .skeleton i { display: block; height: 14px; border-radius: 4px; background: linear-gradient(90deg, var(--grid) 0%, var(--surface-2) 50%, var(--grid) 100%); background-size: 200% 100%; animation: shimmer 1.4s linear infinite; }
 .skeleton i:nth-child(3n) { width: 70%; } .skeleton i:nth-child(3n+1) { width: 88%; }
@@ -360,6 +363,7 @@ dl.calls dd { margin: 0; }
 
 footer.disclaimer { flex: none; display: flex; justify-content: space-between; gap: 6px 18px; padding: 6px 16px; font-size: 11px; color: var(--muted); border-top: 1px solid var(--border); line-height: 1.4; white-space: nowrap; overflow: hidden; }
 footer.disclaimer span { overflow: hidden; text-overflow: ellipsis; }
+footer.disclaimer span.keep { flex: none; }
 @media (max-width: 1100px) { footer.disclaimer { flex-wrap: wrap; justify-content: center; white-space: normal; } }
 footer.disclaimer a, footer.disclaimer .linkish { color: var(--ink-2); font-size: inherit; }
 .disclaimer-box { border: 1px solid var(--axis); border-radius: 8px; padding: 10px 12px; background: var(--surface-2); }
@@ -511,6 +515,47 @@ svg#map .me-halo { fill: var(--proj); opacity: .25; transform-box: fill-box; tra
 .about p { margin: 0 0 10px; }
 .about a { color: var(--ink); }
 .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+
+/* Watch list: stars on candidates, and a strip that stays in view */
+:root { --watch: #c98500; --watch-ink: #8a5a00; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --watch: #eda100; --watch-ink: #eda100; } }
+:root[data-theme="dark"] { --watch: #eda100; --watch-ink: #eda100; }
+.star { border: 0; background: none; padding: 0; width: 18px; height: 18px; display: inline-grid; place-items: center; font-size: 14px; line-height: 1; color: var(--muted); cursor: pointer; border-radius: 4px; opacity: 0; transition: opacity .12s, color .12s, transform .12s; }
+.star[aria-pressed="true"] { color: var(--watch); opacity: 1; }
+.cand:hover .star, .pc:hover .star, .star:focus-visible { opacity: 1; }
+.star:hover { color: var(--watch); transform: scale(1.15); }
+@media (hover: none) { .star { opacity: .55; } .star[aria-pressed="true"] { opacity: 1; } }
+.cand { grid-template-columns: 24px minmax(0, 1fr) auto auto 46px 18px; }
+.pc .star { position: absolute; top: 4px; right: 5px; }
+.watch { flex: none; position: sticky; bottom: 0; z-index: 15; background: color-mix(in srgb, var(--page) 94%, transparent); backdrop-filter: blur(8px); border-top: 1px solid var(--border); padding: 6px 16px 8px; }
+.watch[hidden] { display: none; }
+.watch-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 5px; }
+.watch-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--watch-ink); }
+.watch-hint { font-size: 11px; color: var(--muted); }
+.watch-list { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; }
+.watch-list::-webkit-scrollbar { display: none; }
+.wc { flex: none; display: grid; grid-template-columns: 18px 30px minmax(0, 1fr) auto; grid-template-areas: "s a n p" "s a r v" "s a g g"; gap: 0 8px; align-items: center; width: 300px; padding: 6px 10px 6px 6px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); cursor: pointer; text-align: left; line-height: 1.3; }
+.wc:hover { border-color: color-mix(in srgb, var(--ink) 25%, transparent); }
+.wc:focus-visible { outline: 2px solid var(--s1); outline-offset: 1px; }
+.wc .star { grid-area: s; opacity: 1; }
+.wc .av { grid-area: a; width: 30px; height: 30px; margin: 0; }
+.wc-name { grid-area: n; font-size: 13px; font-weight: 650; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.wc-race { grid-area: r; font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.wc-pos { grid-area: p; font-size: 13px; font-weight: 700; text-align: right; font-variant-numeric: tabular-nums; }
+.wc-pos span { font-weight: 400; color: var(--muted); font-size: 11px; }
+.wc-votes { grid-area: v; font-size: 11.5px; color: var(--ink-2); text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.wc-gap { grid-area: g; font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
+.wc-gap.up { color: var(--good); font-weight: 600; }
+.wc.first { border-color: color-mix(in srgb, var(--good) 45%, transparent); }
+.wc.gone { opacity: .6; cursor: default; grid-template-areas: "s a n n" "s a r r"; }
+@media (max-width: 900px) { .watch { padding: 6px 12px 8px; } .wc { width: min(280px, calc(100vw - 40px)); } .watch-hint { display: none; } }
+/* Stars get a finger-sized hit area without taking more room in the row. */
+.star { position: relative; }
+.star::after { content: ""; position: absolute; inset: -7px; }
+/* Phones: the header scrolls away so the results and the watch strip get the screen; wide tables scroll sideways inside their card. */
+@media (max-width: 900px), (max-height: 500px) { header.top { position: static; } }
+@media (max-width: 900px) { #councilView { overflow-x: auto; -webkit-overflow-scrolling: touch; } }
+@media (max-height: 500px) { .watch-head { display: none; } .watch { padding: 5px 12px 6px; } }
 </style>
 </head>
 <body>
@@ -524,6 +569,7 @@ svg#map .me-halo { fill: var(--proj); opacity: .25; transform-box: fill-box; tra
   </div>
   <button id="status" class="status" type="button"><i></i><span id="statusText">Connecting to results…</span></button>
   <button id="aboutBtn" class="about-btn" type="button">About</button>
+  <button id="themeBtn" class="about-btn theme-btn" type="button"></button>
   <div class="stats" id="stats"></div>
 </header>
 <div id="notice" class="banner" hidden></div>
@@ -582,11 +628,15 @@ svg#map .me-halo { fill: var(--proj); opacity: .25; transform-box: fill-box; tra
     </div>
   </section>
 </main>
+<section id="watch" class="watch" aria-label="Candidates you're watching" hidden>
+  <div class="watch-head"><span class="watch-title">&#9733; Watching</span><span class="watch-hint">Saved on this device · click a star to remove</span></div>
+  <div class="watch-list" id="watchList"></div>
+</section>
 
 <footer class="disclaimer">
   <span>Made by <a href="https://andrewmcgrath.info">Andrew McGrath</a> · ad-free alternative to mainstream media</span>
   <span>Data: City of Toronto unofficial results</span>
-  <span>Calls are our estimates · <button class="linkish" data-goto="m-disclaimer">methodology</button></span>
+  <span class="keep">Calls are our estimates · <button class="linkish" data-goto="m-disclaimer">methodology</button> · <button class="linkish" data-goto="m-privacy">privacy</button></span>
   <span>Provided as is, without representations or warranties; no responsibility for the data</span>
   <span>Official: <a href="https://www.toronto.ca/city-government/elections/">toronto.ca/elections</a></span>
 </footer>
@@ -596,6 +646,7 @@ svg#map .me-halo { fill: var(--proj); opacity: .25; transform-box: fill-box; tra
     <h2 id="welcomeTitle">Toronto 2026 election results</h2>
     <p>Live, unofficial results for mayor, city council and school trustees, straight from the City of Toronto's results feed. An ad-free page by <a href="https://andrewmcgrath.info">Andrew McGrath</a>.</p>
     <ul class="welcome-list">
+      <li><b>Watch candidates:</b> click the &#9734; next to anyone to keep their place and votes in view at the bottom of the page.</li>
       <li><b>Map:</b> hover a ward to see its council race and how it voted for mayor; click to pin it.</li>
       <li><b>Race calls</b> like <span class="call call-projected">&#10003; Projected winner</span> are this page's own estimates. Hover any badge to see why, or read the Methodology tab.</li>
       <li>Results are unofficial until certified by the City Clerk. See <a href="https://www.toronto.ca/city-government/elections/">toronto.ca/elections</a> for official results.</li>

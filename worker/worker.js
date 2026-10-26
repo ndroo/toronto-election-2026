@@ -112,6 +112,11 @@ export class Viewers extends DurableObject {
       this.sql.exec('DELETE FROM history WHERE t < ?', now - HISTORY_MS);
     }
     for (const k of this.buckets.keys()) if (k < b - DAY_MS / BUCKET_MS) this.buckets.delete(k);
+    // The privacy note promises ids are gone after 24 hours, so stored rows are dropped hourly.
+    if (now - (this.pruned || 0) > 60 * 60 * 1000) {
+      this.pruned = now;
+      this.sql.exec('DELETE FROM seen WHERE bucket < ?', Math.floor((now - DAY_MS) / BUCKET_MS));
+    }
   }
 
   stats() {

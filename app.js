@@ -83,6 +83,9 @@
   let openWards = (hash.get('o') || store.get('openWards') || '').split(',').filter(Boolean);
   let board = null; // selected school board office id
   let flashNow = false; // only animate vote changes on data updates, not on hover re-renders
+  // Watched candidates, as `<race key>|<name>` (mayor is always the city-wide race); this device only.
+  const MAX_WATCH = 8;
+  let watch = (() => { try { const v = JSON.parse(store.get('watch') || '[]'); return Array.isArray(v) ? v.filter((x) => typeof x === 'string').slice(0, MAX_WATCH) : []; } catch { return []; } })();
 
   // ---------- model ----------
   // A race: { polls, pollsReceived, totalVoters, votes, cands:[{name, votes, pct, delta}], leader, margin }
@@ -228,7 +231,7 @@
     const ex = (st) => `<span class="call call-${st}">${CALL_LABEL[st]}</span>`;
     const sections = [
       ['m-disclaimer', 'Disclaimer'], ['m-calls', 'Race calls'], ['m-data', 'Where the numbers come from'], ['m-calc', 'How each number is worked out'],
-      ['m-map', 'Map colours'], ['m-photos', 'Candidate photos'], ['m-location', 'Your location'], ['m-limits', 'Limits'],
+      ['m-map', 'Map colours'], ['m-photos', 'Candidate photos'], ['m-location', 'Your location'], ['m-privacy', 'Privacy'], ['m-limits', 'Limits'],
     ];
     $('#method').innerHTML = `
       <h2>Methodology</h2>
@@ -288,6 +291,14 @@
 
       <section id="m-location"><h3>Your location</h3>
       <p>"Find my ward" asks your browser for your location once, and matches it against the ward map on your own device. Your location is never sent to us or anyone else, and it isn't stored. Only your ward number is saved in your browser, so the page can open on your ward next time. Clear your browser's site data to forget it. Ward edges on the map are simplified, so if you're right on a boundary, double-check your ward with the <a href="https://www.toronto.ca/city-government/elections/">City</a>.</p>
+      </section>
+
+      <section id="m-privacy"><h3>Privacy</h3>
+      <p><b>No ads, no cookies, no accounts and no tracking or advertising scripts.</b> Nothing on this page follows you around the web or builds a profile of you, and nothing is sold or shared.</p>
+      <p><b>Counting viewers.</b> To see how many people are using the page, your browser makes up a random code (like <code>3f9a0c71b2e48d65</code>) and sends it along when it checks for new results. It isn't linked to your name, account, location or anything else about you; it only lets us count how many browsers have the page open right now and over the last day. The codes are deleted after 24 hours. Only the totals are kept.</p>
+      <p><b>Saved in your browser only.</b> Your watched candidates, theme, ward (if you used "Find my ward"), last ward viewed, open ward tabs, view choices and the random code are kept in your browser's local storage, on your device. They're never sent anywhere except the random code above. Clear this site's data in your browser to remove them all.</p>
+      <p><b>Your location</b> never leaves your device. See <a href="#" data-jump="m-location">Your location</a>.</p>
+      <p><b>Hosting.</b> The page is served by GitHub Pages, and results pass through a small Cloudflare Worker (or GitHub if that fails). Like any website host, they receive your IP address and browser details to deliver the page, under their own policies (<a href="https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement">GitHub</a>, <a href="https://www.cloudflare.com/privacypolicy/">Cloudflare</a>). We don't collect or keep those request logs. Candidate photos are served from this site, and there are no outside fonts or scripts.</p>
       </section>
 
       <section id="m-limits"><h3>Limits</h3>
@@ -688,6 +699,13 @@
       : `<span class="av av-i"${st}>${esc(initials(name))}</span>`;
   }
 
+  // ---------- watch list ----------
+  const watchKey = (r, name) => `${r.key.startsWith('mayor|') ? 'mayor|city' : r.key}|${name}`;
+  const star = (wk) => {
+    const on = watch.includes(wk);
+    return `<button type="button" class="star" data-watch="${esc(wk)}" aria-pressed="${on}" aria-label="${on ? 'Stop watching' : 'Watch'} ${esc(wk.split('|').slice(2).join('|'))}" title="${on ? 'Stop watching' : 'Watch this candidate'}">${on ? '&#9733;' : '&#9734;'}</button>`;
+  };
+
   // ---------- rendering: lists ----------
   function candList(r, { colour = false, showCall = true } = {}) {
     if (!r || !r.cands.length) return '<li class="empty">No candidates in feed</li>';
@@ -704,6 +722,7 @@
         <span class="delta">${c.delta ? `+${fmt(c.delta)}` : ''}</span>
         <span class="votes" data-ok="v|${k}">${fmt(c.votes)}</span>
         <span class="pct" data-ok="p|${k}">${pct(c.pct)}</span>
+        ${star(watchKey(r, c.name))}
         <span class="bar"><i data-bk="${k}" style="width:${(c.pct / max) * 100}%;${col ? `background:${col}` : ''}"></i></span>
       </li>`;
     }).join('');
@@ -768,7 +787,7 @@
       const lead = i === 0 && r.leader && !r.tied;
       const tag = lead && CALLED.has(st) ? `<span class="tick tick-${st}" title="${CALL_LABEL[st].replace(/&[^;]+;\s*/g, '')}">&#10003;</span>` : '';
       return `<div class="pc${lead ? ' first' : ''}" data-fk="${k}" title="${esc(c.name)}: ${fmt(c.votes)} votes (${pct(c.pct, 2)})">
-        <span class="pc-rank">${counting ? i + 1 : ''}</span>
+        <span class="pc-rank">${counting ? i + 1 : ''}</span>${star(watchKey(r, c.name))}
         ${avatar('mayor', c.name, col)}
         <div class="pc-name">${esc(c.name)}</div>${tag}
         ${counting ? `<div class="pc-nums"><b data-ok="pp|${k}">${pct(c.pct)}</b><span data-ok="pv|${k}">${fmt(c.votes)}</span></div>
@@ -904,6 +923,76 @@
       <div class="bw-call">${badge(w.race.call)}</div>
       <ul class="cands dense">${candList(w.race)}</ul></div>`).join('')}</div>` : '';
   }
+
+  // ---------- watch strip ----------
+  // Where a watched race lives in the model, what to call it, and how to get to it.
+  function watchedRace(rk) {
+    const [kind, num] = rk.split('|');
+    if (kind === 'mayor') return { r: model.mayor, label: 'Mayor · city-wide', go: () => $('#cityCard').scrollIntoView({ behavior: 'smooth', block: 'nearest' }) };
+    if (kind === 'council') {
+      const r = model.wards[num]?.council;
+      return r && { r, label: `Council · Ward ${num}`, go: () => { setPinned(num, true); setTab('ward'); $('#right').scrollIntoView({ behavior: 'smooth', block: 'nearest' }); } };
+    }
+    const b = model.boards.find((x) => `o${x.id}` === kind);
+    const r = b?.wards.find((w) => String(w.num) === num)?.race;
+    return r && { r, label: `${BOARD_SHORT[b.name] || b.name} trustee · Ward ${num}`, go: () => { racesView = b.id; setTab('wards'); renderBoards(); $('#right').scrollIntoView({ behavior: 'smooth', block: 'nearest' }); } };
+  }
+  const ordinal = (n) => `${n}${[, 'st', 'nd', 'rd'][(n % 100 > 10 && n % 100 < 14) ? 0 : n % 10] || 'th'}`;
+  const lastName = (n) => normName(n).split(' ').pop();
+
+  function renderWatch() {
+    const dock = $('#watch');
+    dock.hidden = !watch.length;
+    document.body.classList.toggle('watching', !!watch.length);
+    if (!watch.length || !model) return;
+    $('#watchList').innerHTML = watch.map((wk) => {
+      const rk = wk.split('|').slice(0, 2).join('|'), name = wk.split('|').slice(2).join('|');
+      const w = watchedRace(rk);
+      const i = w ? w.r.cands.findIndex((c) => c.name === name) : -1;
+      if (i < 0) return `<div class="wc gone">${star(wk)}${avatar('', name)}<div class="wc-name">${esc(name)}</div><div class="wc-race">Not in the current results</div></div>`;
+      const r = w.r, c = r.cands[i], lead = r.cands[0], next = r.cands[1];
+      const counting = r.votes > 0;
+      const rank = 1 + r.cands.filter((x) => x.votes > c.votes).length; // ties share a place
+      const tied = counting && r.cands.some((x) => x !== c && x.votes === c.votes);
+      const st = r.call?.status;
+      const won = rank === 1 && !tied && CALLED.has(st);
+      let gap, cls = '';
+      if (!counting) gap = 'No votes yet';
+      else if (rank === 1 && !tied) { gap = `Leads ${esc(lastName(next?.name || ''))} by ${fmt(c.votes - (next?.votes || 0))}`; cls = ' up'; }
+      else if (rank === 1) gap = 'Tied for the lead';
+      else gap = `${fmt(lead.votes - c.votes)} behind ${esc(lastName(lead.name))}`;
+      return `<div class="wc${rank === 1 && counting && !tied ? ' first' : ''}" data-go="${esc(rk)}" role="button" tabindex="0" title="${esc(c.name)} · ${esc(w.label)} · go to race">
+        ${star(wk)}${avatar(r.pkey, c.name, rk === 'mayor|city' ? candColour(c.name) : null)}
+        <div class="wc-name">${esc(c.name)}${won ? `<span class="tick tick-${st}" title="${CALL_LABEL[st].replace(/&[^;]+;\s*/g, '')}">&#10003;</span>` : ''}</div>
+        <div class="wc-pos">${counting ? `${tied ? 'T-' : ''}${ordinal(rank)} <span>of ${r.cands.length}</span>` : `<span>${r.cands.length} running</span>`}</div>
+        <div class="wc-race">${esc(w.label)}</div>
+        <div class="wc-votes">${counting ? `${fmt(c.votes)} · <b>${pct(c.pct)}</b>` : ''}</div>
+        <div class="wc-gap${cls}">${gap}</div>
+      </div>`;
+    }).join('');
+  }
+  function toggleWatch(wk) {
+    watch = watch.includes(wk) ? watch.filter((x) => x !== wk) : [...watch, wk].slice(-MAX_WATCH);
+    store.set('watch', JSON.stringify(watch));
+    const on = watch.includes(wk);
+    for (const b of document.querySelectorAll(`.star[data-watch="${CSS.escape(wk)}"]`)) {
+      b.setAttribute('aria-pressed', String(on)); b.innerHTML = on ? '&#9733;' : '&#9734;';
+      b.title = on ? 'Stop watching' : 'Watch this candidate';
+    }
+    renderWatch();
+  }
+  // Stars live inside rows and cards that have their own hover and click behaviour, so they stop the event here.
+  document.addEventListener('click', (e) => {
+    const s = e.target.closest('.star');
+    if (s) { e.preventDefault(); e.stopPropagation(); toggleWatch(s.dataset.watch); return; }
+    const g = e.target.closest('#watch [data-go]');
+    if (g && model) watchedRace(g.dataset.go)?.go();
+  }, true);
+  $('#watch').addEventListener('keydown', (e) => {
+    const g = e.target.closest('[data-go]');
+    if (g && (e.key === 'Enter' || e.key === ' ') && e.target === g) { e.preventDefault(); watchedRace(g.dataset.go)?.go(); }
+  });
+
   $('#raceSwitch').addEventListener('click', (e) => {
     const btn = e.target.closest('button'); if (!btn) return;
     racesView = btn.dataset.v === 'council' ? 'council' : int(btn.dataset.v);
@@ -1065,7 +1154,7 @@
   function renderAll(quiet = false) {
     const snap = snapshot();
     flashNow = true;
-    renderStatus(); renderStats(); renderMap(); renderCity(); renderWard(); renderTable(); renderBoards(); renderTip();
+    renderStatus(); renderStats(); renderMap(); renderCity(); renderWard(); renderTable(); renderBoards(); renderWatch(); renderTip();
     flashNow = false;
     animateChanges(snap, quiet);
   }
@@ -1209,6 +1298,29 @@
     $('#demoRestart').addEventListener('click', () => { demoP = 0; demoHold = 0; demoTick = 0; demoPrev.clear(); odoPrev.clear(); deltaPrev.clear(); demoQuiet = true; demoPaused = false; $('#demoPause').textContent = 'Pause'; tick(); });
   }
   matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => model && renderAll());
+  // Theme: follow the device (auto), or force light or dark; remembered on this device.
+  const THEMES = {
+    auto: ['Auto', '<svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.25" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 1.75a6.25 6.25 0 0 1 0 12.5z" fill="currentColor"/></svg>'],
+    light: ['Light', '<svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="3" fill="currentColor"/><path d="M8 1v2M8 13v2M1 8h2M13 8h2M3.05 3.05l1.4 1.4M11.55 11.55l1.4 1.4M3.05 12.95l1.4-1.4M11.55 4.45l1.4-1.4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>'],
+    dark: ['Dark', '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M13.5 10.2A6 6 0 0 1 5.8 2.5a6 6 0 1 0 7.7 7.7z" fill="currentColor"/></svg>'],
+  };
+  const themeOrder = ['auto', 'light', 'dark'];
+  let theme = THEMES[store.get('theme')] ? store.get('theme') : 'auto';
+  function applyTheme() {
+    if (theme === 'auto') delete document.documentElement.dataset.theme; else document.documentElement.dataset.theme = theme;
+    const [label, icon] = THEMES[theme];
+    const next = themeOrder[(themeOrder.indexOf(theme) + 1) % 3];
+    $('#themeBtn').innerHTML = `${icon}<span>${label}</span>`;
+    $('#themeBtn').setAttribute('aria-label', `Theme: ${label}. Switch to ${THEMES[next][0]}`);
+    $('#themeBtn').title = `Theme: ${label}${theme === 'auto' ? ' (follows your device)' : ''} · click for ${THEMES[next][0]}`;
+  }
+  applyTheme();
+  $('#themeBtn').addEventListener('click', () => {
+    theme = themeOrder[(themeOrder.indexOf(theme) + 1) % 3];
+    store.set('theme', theme);
+    applyTheme();
+    if (model) renderAll(true); else if (geo) renderMap(); // map and chart colours are read from the theme
+  });
   Promise.all([
     fetch('wards.json').then((r) => r.json()),
     fetch('photos.json').then((r) => r.json()).catch(() => ({})),
