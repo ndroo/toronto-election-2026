@@ -25,6 +25,11 @@
         { id: 'raw', url: `https://raw.githubusercontent.com/${OWNER}/${REPO}/data/bundle.json` },
       ];
   const STALE_MS = 7 * 60 * 1000;
+  // Race-call thresholds. The About tab explains them using these same values.
+  const CALL = { minReporting: 0.25, safety: 1.5, needShare: 0.75, swing: 0.30 };
+  // The City's feed never marks results official. When the City Clerk certifies the election,
+  // set `certified` to the date (e.g. 'October 28, 2026') and every call becomes "Official winner".
+  const OFFICIAL = { certified: null, url: 'https://www.toronto.ca/city-government/elections/election-results-reports/election-results/' };
   const TZ = 'America/Toronto';
 
   // ---------- helpers ----------
@@ -53,7 +58,7 @@
   let pinned = hash.get('w') || '1';
   let hover = null;
   let sort = { key: 'num', dir: 1 };
-  let tab = ['ward', 'wards', 'school', 'about'].includes(hash.get('t')) ? hash.get('t') : 'ward';
+  let tab = ['ward', 'wards', 'school', 'method'].includes(hash.get('t')) ? hash.get('t') : 'ward';
   let board = null; // selected school board office id
   let flashNow = false; // only animate vote changes on data updates, not on hover re-renders
 
@@ -129,8 +134,153 @@
       });
     }
     prevVotes = nextVotes;
+    // Calls. City-wide mayor estimates the votes still to come ward by ward.
+    const perPoll = m.mayor.pollsReceived ? m.mayor.votes / m.mayor.pollsReceived : 0;
+    const mayorLeft = Object.values(m.wards).reduce((sum, w) => {
+      const r = w.mayor; if (!r) return sum;
+      return sum + (r.pollsReceived ? r.votes / r.pollsReceived : perPoll) * (r.polls - r.pollsReceived);
+    }, 0);
+    m.mayor.call = callRace(m.mayor, mayorLeft);
+    for (const w of Object.values(m.wards)) if (w.council) w.council.call = callRace(w.council);
+    for (const b of m.boards) for (const w of b.wards) w.race.call = callRace(w.race);
     return m;
   }
+
+  // ---------- race calls ----------
+  // status: awaiting | leading | tied | projected | decided | official, with a plain-English reason.
+  function callRace(r, estLeft) {
+    if (!r || !r.cands.length) return null;
+    const [a, b] = r.cands;
+    if (OFFICIAL.certified && r.leader && !r.tied) return { status: 'official', reason: `Certified by the City Clerk on ${OFFICIAL.certified}` };
+    if (!b) return { status: 'decided', reason: 'Only candidate in this race' };
+    if (!r.leader || !r.pollsReceived) return { status: 'awaiting', reason: 'No polls reported yet' };
+    if (r.tied) return { status: 'tied', reason: `Tied at ${fmt(a.votes)} votes each` };
+    if (r.complete) return { status: 'decided', reason: `All ${fmt(r.polls)} polls reported - unofficial until certified` };
+    const gap = a.votes - b.votes;
+    const maxLeft = Math.max(0, r.totalVoters - r.votes);
+    if (gap > maxLeft) return { status: 'decided', reason: `Lead of ${fmt(gap)} is bigger than all ${fmt(maxLeft)} electors not yet counted` };
+    const left = Math.min(maxLeft, (estLeft ?? (r.votes / r.pollsReceived) * (r.polls - r.pollsReceived)) * CALL.safety);
+    const topTwo = r.votes ? left * ((a.votes + b.votes) / r.votes) : 0;
+    const need = topTwo > 0 ? (topTwo + gap) / (2 * topTwo) : Infinity;
+    const hasNow = b.votes / (a.votes + b.votes); // runner-up's share of the top-two vote so far
+    const why = `${b.name} would need ${need > 1 ? 'more than all' : `${Math.round(need * 100)}%`} of an estimated ${fmt(Math.round(topTwo))} votes still to come between the top two, and has ${Math.round(hasNow * 100)}% so far`;
+    const rep = r.pollsReceived / r.polls;
+    if (rep < CALL.minReporting) return { status: 'leading', need, reason: `Too early to call - ${pct(rep * 100, 0)} of polls in, calls start at ${CALL.minReporting * 100}%` };
+    return { status: need >= CALL.needShare || need - hasNow >= CALL.swing ? 'projected' : 'leading', need, reason: why };
+  }
+  const CALL_LABEL = { official: '&#10003; Official winner', decided: '&#10003; Decided &middot; unofficial', projected: '&#9670; Projected winner', leading: 'Leading', tied: 'Tied', awaiting: 'Awaiting results' };
+  const CALLED = new Set(['projected', 'decided', 'official']);
+  // One definition per label, shared by the hover card and the Methodology tab.
+  const CALL_DEF = {
+    awaiting: 'No polls in this race have reported yet.',
+    leading: `Ahead, but not by enough to call. No race is called until at least ${CALL.minReporting * 100}% of its polls are in.`,
+    tied: 'The top two candidates have exactly the same number of votes.',
+    projected: `This page's estimate, not an official result: at least ${CALL.minReporting * 100}% of polls are in, and to catch up the runner-up would need ${CALL.needShare * 100}% or more of the remaining votes between the top two, or a share ${CALL.swing * 100} or more points higher than they have managed so far.`,
+    decided: 'Settled by the numbers: all polls are in, the lead is bigger than every elector not yet counted, or only one candidate is running. Still unofficial until the City Clerk certifies.',
+    official: 'The City Clerk has certified the results. This is set by hand once certified results are posted; the feed never says it.',
+  };
+  const badge = (call) => call ? `<button class="call call-${call.status}" data-method data-status="${call.status}" data-reason="${esc(call.reason)}" aria-label="${CALL_LABEL[call.status].replace(/&[^;]+;\s*/g, '')}: ${esc(call.reason)}">${CALL_LABEL[call.status]}</button>` : '';
+  const why = (call) => call && call.status !== 'awaiting' ? `<div class="call-why">${esc(call.reason)}</div>` : '';
+
+  function renderMethod() {
+    const ex = (st) => `<span class="call call-${st}">${CALL_LABEL[st]}</span>`;
+    const sections = [
+      ['m-disclaimer', 'Disclaimer'], ['m-calls', 'Race calls'], ['m-data', 'Where the numbers come from'], ['m-calc', 'How each number is worked out'],
+      ['m-map', 'Map colours'], ['m-limits', 'Limits'],
+    ];
+    $('#method').innerHTML = `
+      <h2>Methodology</h2>
+      <p>How this page gets its data and turns it into what you see. All of it runs in your browser from the City's published feed.</p>
+      <nav class="toc">${sections.map(([id, t]) => `<a href="#" data-jump="${id}">${t}</a>`).join('')}</nav>
+
+      <section id="m-disclaimer"><h3>Disclaimer</h3>
+      <div class="disclaimer-box">
+        <p>This page was made by <a href="https://andrewmcgrath.info">Andrew McGrath</a> and is offered as an ad-free alternative to mainstream media platforms. It is not affiliated with the City of Toronto.</p>
+        <p>All results come from the City of Toronto's unofficial results feed and are unofficial until certified by the City Clerk. Race calls ("Projected winner", "Decided") are this page's own estimates using the method below, not official results or City announcements.</p>
+        <p>This page is provided as is, without representations or warranties of any kind. We take no responsibility for the accuracy, completeness or timeliness of the data or projections. For official results, see the <a href="https://www.toronto.ca/city-government/elections/">City of Toronto elections website</a>.</p>
+      </div>
+      </section>
+
+      <section id="m-calls"><h3>Race calls</h3>
+      <p><b>The City's feed only reports unofficial vote counts. It never says a race is decided.</b> Every label below is this page's own estimate, recalculated each time the feed updates. News outlets may call races sooner or later using other information.</p>
+      <dl class="calls">${['awaiting', 'leading', 'tied', 'projected', 'decided', 'official'].map((st) => `<dt>${ex(st)}</dt><dd>${CALL_DEF[st]}</dd>`).join('')}</dl>
+      <p><b>The projection, step by step</b></p>
+      <ol>
+        <li>Wait until at least <b>${CALL.minReporting * 100}%</b> of the race's polls have reported.</li>
+        <li>Estimate the votes still to come: average votes per poll so far × polls not yet reported. For mayor this is done ward by ward and added up, so a big ward reporting late is not underestimated.</li>
+        <li>Multiply that estimate by <b>${CALL.safety}</b> as a safety margin, and cap it at the number of electors not yet counted.</li>
+        <li>Assume the top two keep the same combined share of those votes they have so far, and work out what share of them the runner-up needs to draw level.</li>
+        <li>If the runner-up would need <b>${CALL.needShare * 100}% or more</b> of those votes, or a share at least <b>${CALL.swing * 100} points higher</b> than their share of the top-two vote so far (for example 40% when they have had 8%), the leader is shown as <span class="call call-projected">${CALL_LABEL.projected}</span>. Below that, <span class="call call-leading">Leading</span>. Every badge shows the actual figure for that race when you hover it.</li>
+      </ol>
+      <p>Only the city-wide mayor's race is called. The mayor results shown for each ward are the votes cast there, not a separate race. Council and school trustee races are each called on their own numbers.</p>
+      <p><b>Official results:</b> ${OFFICIAL.certified ? `certified by the City Clerk on ${esc(OFFICIAL.certified)}.` : 'not certified yet.'} Certification happens after election night and is posted on the <a href="${OFFICIAL.url}">City's election results page</a>. The page is switched to "Official winner" by hand at that point.</p>
+      </section>
+
+      <section id="m-data"><h3>Where the numbers come from</h3>
+      <p>The City of Toronto's unofficial results feeds: <a href="https://mediaresults.toronto.ca/results/unofficialresult.json">all offices</a> (mayor, council, four school boards) and <a href="https://mediaresults.toronto.ca/results/unofficialresult-wardbyward.json">mayor by ward</a>. The City updates them about every 60 seconds from 8 p.m. on election night until all results are in. This page checks every 30 seconds.</p>
+      <p>The feed blocks cross-origin requests from browsers, so it is passed through unchanged by a small Cloudflare Worker (each file cached up to 15 seconds). If that fails, the page uses a copy kept by a GitHub Actions job, which can be 1-2 minutes behind; a notice appears when that happens.</p>
+      <p>Advance-vote results are added into ward totals on election night. Results by voting place are published on Toronto Open Data only after certification.</p>
+      </section>
+
+      <section id="m-calc"><h3>How each number is worked out</h3>
+      <dl class="calls defs">
+        <dt>Votes</dt><dd>As reported by the feed, unchanged.</dd>
+        <dt>Percent</dt><dd>The feed's own percentage for city-wide and ward races. For mayor results within a ward (which the feed gives without percentages), votes ÷ total mayor votes counted in that ward.</dd>
+        <dt>Polls reporting</dt><dd>Voting subdivisions received ÷ total subdivisions, from the feed. Advance-vote subdivisions are included.</dd>
+        <dt>Turnout</dt><dd>Ballots counted for the office ÷ eligible electors on the list, both from the feed. It rises as polls report and is only final when all polls are in.</dd>
+        <dt>Lead</dt><dd>Leader's percent minus second place's percent, in percentage points.</dd>
+        <dt>+ green numbers</dt><dd>Votes added since the previous update you saw.</dd>
+      </dl>
+      </section>
+
+      <section id="m-map"><h3>Map colours</h3>
+      <p><b>Mayor leader:</b> the top three mayoral candidates city-wide each get a colour, and keep it even if their ranks change. A ward led by anyone else, or tied, is grey. Darker means a wider lead in that ward (full strength at 30 points or more).</p>
+      <p><b>Council margin:</b> darker blue means a wider lead for the council leader (full strength at 40 points). <b>Reporting</b> and <b>Turnout:</b> darker means higher (turnout full strength at 60%).</p>
+      <p>Ward boundaries: <a href="https://open.toronto.ca/dataset/city-wards/">Toronto Open Data</a>, 25-ward model, simplified for the web.</p>
+      </section>
+
+      <section id="m-limits"><h3>Limits</h3>
+      <p>Polls do not report in random order. Advance-vote polls (subdivisions 98 and 99 in each ward) and whole neighbourhoods can arrive in batches, so early numbers can lean one way. The minimum share of polls and the safety margin are there to absorb that, but a projection can still be wrong.</p>
+      <p>The feed has no historical results, demographics or poll-by-poll counts, so the projection cannot model how particular areas usually vote.</p>
+      </section>`;
+  }
+  $('#method').addEventListener('click', (e) => {
+    const a = e.target.closest('[data-jump]');
+    if (a) { e.preventDefault(); document.getElementById(a.dataset.jump).scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+  });
+
+  document.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-goto]');
+    if (b) { setTab('method'); document.getElementById(b.dataset.goto).scrollIntoView({ block: 'start' }); }
+  });
+
+  // Hover card for call badges: definition + this race's own numbers.
+  const callTip = $('#callTip');
+  function showCallTip(el) {
+    const st = el.dataset.status;
+    if (!st) return;
+    callTip.innerHTML = `<span class="call call-${st}">${CALL_LABEL[st]}</span><p class="def">${CALL_DEF[st]}</p>
+      ${el.dataset.reason ? `<div class="this"><b>This race</b>${el.dataset.reason}</div>` : ''}<div class="more">Click for the full methodology</div>`;
+    const r = el.getBoundingClientRect();
+    callTip.classList.add('on');
+    const w = callTip.offsetWidth, h = callTip.offsetHeight;
+    let left = Math.min(innerWidth - w - 8, Math.max(8, r.left + r.width / 2 - w / 2));
+    let top = r.bottom + 8;
+    if (top + h > innerHeight - 8) top = r.top - h - 8;
+    callTip.style.left = `${left}px`; callTip.style.top = `${top}px`;
+  }
+  const hideCallTip = () => callTip.classList.remove('on');
+  document.addEventListener('pointerover', (e) => { const el = e.target.closest('.call[data-status]'); if (el) showCallTip(el); });
+  document.addEventListener('pointerout', (e) => { if (e.target.closest('.call[data-status]')) hideCallTip(); });
+  document.addEventListener('focusin', (e) => { const el = e.target.closest('.call[data-status]'); if (el) showCallTip(el); });
+  document.addEventListener('focusout', hideCallTip);
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('[data-method]')) return;
+    e.stopPropagation();
+    hideCallTip();
+    setTab('method');
+    document.getElementById('m-calls').scrollIntoView({ block: 'start' });
+  }, true);
 
   function assignColours() {
     const top = model.mayor.cands.filter((c) => c.votes > 0).slice(0, 3).map((c) => c.name);
@@ -311,21 +461,26 @@
     renderLegend();
   }
 
+  // Always two rows (key, then notes) so switching modes never changes the card's height.
   function renderLegend() {
-    const L = $('#legend');
     const ramp = (lo, hi) => `${lo}<span class="ramp">${seqRamp().map((c) => `<span style="background:${c}"></span>`).join('')}</span>${hi}`;
-    const nd = `<span><i class="sw" style="background:${css('--nodata')}"></i>No votes yet</span>`;
+    const sw = (bg, label) => `<span><i class="sw" style="background:${bg}"></i>${label}</span>`;
+    let key, note;
     if (mode === 'mayor') {
-      const items = [...colorOf.entries()].sort((a, b) => a[1] - b[1])
-        .map(([n, s]) => `<span><i class="sw" style="background:var(--s${s})"></i>${esc(n)}</span>`);
-      L.innerHTML = items.join('') + `<span><i class="sw" style="background:var(--other)"></i>Other / tied</span>${nd}<span>Darker = wider lead</span><span style="color:var(--muted)">Hover to preview · click to pin</span>`;
+      key = [...colorOf.entries()].sort((a, b) => a[1] - b[1]).map(([n, s]) => sw(`var(--s${s})`, esc(n))).join('') + sw('var(--other)', 'Other / tied');
+      note = 'Darker = wider lead';
     } else if (mode === 'council') {
-      L.innerHTML = `<span>Lead over 2nd place: ${ramp('0', '40+ pts')}</span>${nd}`;
+      key = `<span>Council leader's lead over 2nd: ${ramp('0', '40+ pts')}</span>`;
+      note = 'Darker = safer seat';
     } else if (mode === 'reporting') {
-      L.innerHTML = `<span>Polls reporting: ${ramp('0%', '100%')}</span>`;
+      key = `<span>Polls reporting: ${ramp('0%', '100%')}</span>`;
+      note = 'Darker = more counted';
     } else {
-      L.innerHTML = `<span>Turnout (mayor ballots / electors): ${ramp('0%', '60%+')}</span>${nd}`;
+      key = `<span>Turnout, mayor ballots ÷ electors: ${ramp('0%', '60%+')}</span>`;
+      note = 'Darker = higher turnout';
     }
+    $('#legend').innerHTML = `<div class="lg-row">${key}</div>
+      <div class="lg-row lg-note">${sw(css('--nodata'), 'No votes yet')}<span>${note}</span><span>Hover to preview · click to pin</span></div>`;
   }
 
   // ---------- hover / pin ----------
@@ -375,13 +530,14 @@
   }
 
   // ---------- rendering: lists ----------
-  function candList(r, { colour = false, showComplete = true } = {}) {
+  function candList(r, { colour = false, showCall = true } = {}) {
     if (!r || !r.cands.length) return '<li class="empty">No candidates in feed</li>';
     const max = Math.max(1, ...r.cands.map((c) => c.pct));
     return r.cands.map((c, i) => {
       const lead = r.leader && i === 0 && !r.tied;
       const col = colour ? candColour(c.name) : null;
-      const tag = lead && showComplete && r.complete ? '<span class="tag">Unofficial winner</span>' : '';
+      const st = r.call?.status;
+      const tag = lead && showCall && CALLED.has(st) ? `<span class="tag tag-${st}">${{ projected: 'Projected', decided: 'Decided', official: 'Official' }[st]}</span>` : '';
       return `<li class="cand${lead ? ' lead' : ''}${c.delta && flashNow ? ' flash' : ''}" title="${esc(c.name)}: ${fmt(c.votes)} votes (${pct(c.pct, 2)})${c.delta ? `, +${fmt(c.delta)} since last update` : ''}">
         <span class="sw" style="background:${col || 'transparent'}"></span>
         <span class="nm">${esc(c.name)}${tag}</span>
@@ -415,10 +571,10 @@
           <span>${fmt(rep.totalVoters)} electors</span>` : ''}</div>
       </div>
       <div class="races">
-        <div class="race"><div class="race-head"><h3>Council</h3><span class="meta">${raceMeta(w.council)}</span></div>
+        <div class="race"><div class="race-head"><h3>Council</h3>${badge(w.council?.call)}<span class="meta">${raceMeta(w.council)}</span></div>${why(w.council?.call)}
           <div class="scroller"><ul class="cands">${candList(w.council)}</ul></div></div>
-        <div class="race"><div class="race-head"><h3>Mayor</h3><span class="meta">${raceMeta(w.mayor)}</span></div>
-          <div class="scroller"><ul class="cands dense">${candList(w.mayor, { colour: true, showComplete: false })}</ul></div></div>
+        <div class="race"><div class="race-head"><h3>Mayor</h3><span class="meta">${raceMeta(w.mayor)}</span></div><div class="call-why">Votes cast in this ward. The mayor's race is called city-wide.</div>
+          <div class="scroller"><ul class="cands dense">${candList(w.mayor, { colour: true, showCall: false })}</ul></div></div>
       </div>`;
     el.querySelectorAll('.scroller').forEach((x, i) => { if (keep[i]) x.scrollTop = keep[i]; });
   }
@@ -426,6 +582,8 @@
   function renderCity() {
     const r = model.mayor;
     $('#cityMeta').textContent = raceMeta(r);
+    $('#cityBadge').innerHTML = badge(r.call);
+    $('#cityWhy').innerHTML = why(r.call);
     const [a, b] = r.cands;
     $('#cityLead').innerHTML = r.leader
       ? (r.tied ? `<b>Tied</b> at ${fmt(a.votes)} votes` : `<b>${esc(a.name)}</b> leads ${esc(b?.name || '')} by <b>${fmt(a.votes - (b?.votes || 0))}</b> votes (${(a.pct - (b?.pct || 0)).toFixed(1)} pts)`)
@@ -438,11 +596,14 @@
     const r = model.mayor;
     const wards = Object.values(model.wards);
     const wardsDone = wards.filter((w) => (w.mayor || w.council)?.complete).length;
+    const council = wards.map((w) => w.council?.call?.status);
+    const called = council.filter((x) => CALLED.has(x)).length;
     const s = [
-      ['Polls reporting', `${fmt(r.pollsReceived)}/${fmt(r.polls)} (${pct(r.polls ? (r.pollsReceived / r.polls) * 100 : 0, 0)})`, meter(r.polls ? r.pollsReceived / r.polls : 0, r.complete)],
+      ['Mayor', badge(r.call), '<span class="meter blank"></span>'],
+      ['Council called', `${called}/${wards.length}`, meter(wards.length ? called / wards.length : 0, called === wards.length)],
+      [`Polls reporting · ${pct(r.polls ? (r.pollsReceived / r.polls) * 100 : 0, 0)}`, `${fmt(r.pollsReceived)}/${fmt(r.polls)}`, meter(r.polls ? r.pollsReceived / r.polls : 0, r.complete)],
       ['Wards complete', `${wardsDone}/${wards.length}`, meter(wards.length ? wardsDone / wards.length : 0, wards.length > 0 && wardsDone === wards.length)],
-      ['Mayor ballots', fmt(r.votes), '<span class="meter blank"></span>'],
-      ['Turnout', `${pct(r.totalVoters ? (r.votes / r.totalVoters) * 100 : 0)} of ${fmt(r.totalVoters)}`, meter(r.totalVoters ? r.votes / r.totalVoters : 0)],
+      [`Turnout · ${fmt(r.votes)} of ${fmt(r.totalVoters)}`, pct(r.totalVoters ? (r.votes / r.totalVoters) * 100 : 0), meter(r.totalVoters ? r.votes / r.totalVoters : 0)],
     ];
     $('#stats').innerHTML = s.map(([k, v, m]) => `<div class="stat"><b>${v}</b>${m}<span>${k}</span></div>`).join('');
   }
@@ -461,9 +622,9 @@
       const relayAge = model.relayedAt ? Date.now() - model.relayedAt : 0;
       if (lastErr) { st.classList.add('error'); tx.textContent = `Connection problem - showing data from ${gen}`; }
       else if (!DEMO && relayAge > STALE_MS) { st.classList.add('stale'); tx.textContent = `Relay delayed - last checked ${ago(relayAge)}`; }
-      else if (r.complete) { st.classList.add('live'); tx.textContent = `All polls reported - feed ${gen}`; }
-      else if (r.pollsReceived > 0) { st.classList.add('live'); tx.textContent = `Live - feed ${gen}`; }
-      else { tx.textContent = `Waiting for results (polls close 8 p.m.) - feed ${gen}`; }
+      else if (r.complete) { st.classList.add('live'); tx.textContent = `All polls in · ${gen}`; }
+      else if (r.pollsReceived > 0) { st.classList.add('live'); tx.textContent = `Live · ${gen}`; }
+      else { tx.textContent = `Polls close 8 p.m. · feed ${gen}`; }
       if (usedSource === 'raw') note = 'GitHub API limit reached for your network - using a backup copy that can lag up to 5 minutes.';
       $('#srcInfo').textContent = ` Feed seq ${model.seq}${model.relayedAt ? `, relay checked ${time(model.relayedAt)}` : ''}${model.changedAt ? `, last change ${time(model.changedAt)}` : ''}.`;
     }
@@ -471,14 +632,11 @@
   }
 
   const COLS = [
-    { key: 'num', label: '#', n: true, v: (w) => w.num },
-    { key: 'name', label: 'Ward', v: (w) => w.name },
+    { key: 'num', label: 'Ward', v: (w) => w.num },
     { key: 'rep', label: 'Reporting', v: (w) => { const r = w.mayor || w.council; return r?.polls ? r.pollsReceived / r.polls : 0; } },
-    { key: 'turn', label: 'Turnout', n: true, v: (w) => (w.mayor?.totalVoters ? w.mayor.votes / w.mayor.totalVoters : 0) },
-    { key: 'mlead', label: 'Mayor leader', v: (w) => w.mayor?.leader?.name || '' },
-    { key: 'mpct', label: '% · lead', n: true, v: (w) => w.mayor?.leader?.pct || 0 },
-    { key: 'clead', label: 'Council leader', v: (w) => w.council?.leader?.name || '' },
-    { key: 'cpct', label: '% · lead', n: true, v: (w) => w.council?.leader?.pct || 0 },
+    { key: 'turn', label: 'Turnout', v: (w) => (w.mayor?.totalVoters ? w.mayor.votes / w.mayor.totalVoters : 0) },
+    { key: 'mmar', label: 'Mayor leader here', v: (w) => w.mayor?.margin || 0 },
+    { key: 'cmar', label: 'Council leader', v: (w) => w.council?.margin || 0 },
   ];
   function renderTable() {
     const t = $('#wardTable');
@@ -491,24 +649,26 @@
       if (!r?.leader) return '<span style="color:var(--muted)">-</span>';
       if (r.tied) return 'Tied';
       const c = colour ? candColour(r.leader.name) || css('--other') : null;
-      return `<span class="who">${c ? `<i style="background:${c}"></i>` : ''}${esc(r.leader.name)}${r.complete ? ' <span class="done">&#10003;</span>' : ''}</span>`;
+      const st = r.call?.status;
+      const ico = CALLED.has(st) ? `<span class="ico ico-${st}" aria-label="${st}">${st === 'projected' ? '&#9670;' : '&#10003;'}</span>` : '';
+      return `<span class="who">${c ? `<i style="background:${c}"></i>` : ''}${ico}${esc(r.leader.name)}</span>`;
     };
     t.innerHTML = `<thead><tr>${COLS.map((c) => `<th data-k="${c.key}"${c.n ? ' class="n"' : ''}${sort.key === c.key ? ` aria-sort="${sort.dir > 0 ? 'ascending' : 'descending'}"` : ''}>${c.label}</th>`).join('')}</tr></thead>
       <tbody>${rows.map((w) => {
         const r = w.mayor || w.council;
         const rp = r?.polls ? r.pollsReceived / r.polls : 0;
         return `<tr data-w="${w.num}" class="${String(w.num) === pinned ? 'pinned' : ''}${String(w.num) === hover ? ' hot' : ''}">
-          <td class="n">${w.num}</td><td>${esc(w.name)}</td>
-          <td><span class="num">${r ? `${r.pollsReceived}/${r.polls}` : ''}</span>${r?.complete ? ' <span class="done">&#10003;</span>' : ''}${meter(rp, r?.complete)}</td>
-          <td class="n">${pct(COLS[3].v(w) * 100)}${meter(COLS[3].v(w))}</td>
-          <td>${who(w.mayor, true)}</td><td class="n">${w.mayor?.leader ? `${pct(w.mayor.leader.pct)}<span class="sub">+${w.mayor.margin.toFixed(1)}</span>` : ''}</td>
-          <td>${who(w.council)}<span class="sub">of ${w.council?.cands.length ?? 0}</span></td><td class="n">${w.council?.leader ? `${pct(w.council.leader.pct)}<span class="sub">+${w.council.margin.toFixed(1)}</span>` : ''}</td>
+          <td><b class="num">${w.num}</b> ${esc(w.name)}</td>
+          <td><span class="num">${r ? `${r.pollsReceived}/${r.polls}` : ''}</span>${meter(rp, r?.complete)}</td>
+          <td><span class="num">${pct(COLS[2].v(w) * 100)}</span>${meter(COLS[2].v(w))}</td>
+          <td>${who(w.mayor, true)}${w.mayor?.leader ? `<div class="sub2">${pct(w.mayor.leader.pct)} · lead ${w.mayor.margin.toFixed(1)} pts</div>` : ''}</td>
+          <td>${who(w.council)}${w.council?.leader ? `<div class="sub2">${pct(w.council.leader.pct)} · lead ${w.council.margin.toFixed(1)} pts · ${w.council.cands.length} running</div>` : ''}</td>
           </tr>`;
       }).join('')}</tbody>`;
   }
   $('#wardTable').addEventListener('click', (e) => {
     const th = e.target.closest('th');
-    if (th) { const k = th.dataset.k; sort = { key: k, dir: sort.key === k ? -sort.dir : (k === 'num' || k === 'name' || k === 'mlead' || k === 'clead' ? 1 : -1) }; renderTable(); return; }
+    if (th) { const k = th.dataset.k; sort = { key: k, dir: sort.key === k ? -sort.dir : (k === 'num' ? 1 : -1) }; renderTable(); return; }
     const tr = e.target.closest('tbody tr'); if (tr) { setPinned(tr.dataset.w); setTab('ward'); }
   });
   $('#wardTable').addEventListener('mouseover', (e) => { const tr = e.target.closest('tbody tr'); if (tr) { setHover(tr.dataset.w); tip.classList.remove('on'); } });
@@ -522,7 +682,7 @@
       `<button data-b="${b.id}" aria-pressed="${b.id === board}" title="${esc(b.name)}">${esc(BOARD_SHORT[b.name] || b.name)} <span style="opacity:.7">· ${b.wards.length}</span></button>`).join('');
     const b = model.boards.find((x) => x.id === board);
     $('#boards').innerHTML = b ? `<div class="board-grid">${b.wards.map((w) => `
-      <div class="board-ward"><div class="race-head"><h3>${esc(BOARD_SHORT[b.name] || b.name)} Ward ${esc(w.num)}${w.name ? ` - ${esc(w.name)}` : ''}</h3><span class="meta">${raceMeta(w.race)}</span></div>
+      <div class="board-ward"><div class="race-head"><h3>${esc(BOARD_SHORT[b.name] || b.name)} Ward ${esc(w.num)}${w.name ? ` - ${esc(w.name)}` : ''}</h3>${badge(w.race.call)}<span class="meta">${raceMeta(w.race)}</span></div>
       <ul class="cands dense">${candList(w.race)}</ul></div>`).join('')}</div>` : '<div class="empty">No school board races in the feed.</div>';
   }
   $('#boardTabs').addEventListener('click', (e) => { const btn = e.target.closest('button'); if (btn) { board = int(btn.dataset.b); renderBoards(); } });
@@ -532,7 +692,6 @@
     tab = t;
     for (const b of document.querySelectorAll('.tabs button')) b.setAttribute('aria-selected', String(b.dataset.tab === t));
     for (const p of document.querySelectorAll('#right .panel')) p.hidden = p.id !== `panel-${t}`;
-    document.body.classList.toggle('wide-right', t === 'wards' || t === 'school');
     saveHash();
   }
   $('.tabs').addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) setTab(b.dataset.tab); });
@@ -551,6 +710,7 @@
     buildMap();
     if (!geo.wards[pinned]) pinned = '1';
     setTab(tab);
+    renderMethod();
     renderMap(); renderWard();
     tick();
     setInterval(tick, POLL_MS);
