@@ -720,12 +720,17 @@
   // Incumbents (incumbents.json): who held each mayor/council seat going in. Not in the City's feed.
   let incumbents = null;
   const raceKeyOf = (r) => (r.key.startsWith('mayor|') ? 'mayor|city' : r.key);
-  function incTag(r, name, { short = false } = {}) {
+  // "Incumbent" or "Councillor, Ward 19" (a sitting councillor running for this seat), or ''.
+  function incLabel(r, name) {
     const held = incumbents?.races?.[raceKeyOf(r)];
-    if (held?.running && held.running === name) return `<span class="inc" title="Holds this seat going into the election">Incumbent</span>`;
+    if (held?.running && held.running === name) return 'Incumbent';
     const c = incumbents?.councillors?.[name];
-    if (c && c.runningIn === raceKeyOf(r)) return `<span class="inc cllr" title="Sitting councillor for Ward ${c.ward}, running for this seat">Councillor${short ? '' : `, Ward ${c.ward}`}</span>`;
-    return '';
+    return c && c.runningIn === raceKeyOf(r) ? `Councillor, Ward ${c.ward}` : '';
+  }
+  const INC_TITLE = { Incumbent: 'Holds this seat going into the election' };
+  function incTag(r, name) {
+    const l = incLabel(r, name);
+    return l ? `<span class="inc" title="${INC_TITLE[l] || 'A sitting city councillor, running for this seat'}">${l}</span>` : '';
   }
   const openSeat = (r) => { const held = r && incumbents?.races?.[raceKeyOf(r)]; return held && !held.running ? held.incumbent : null; };
   const normName = (n) => n.replace(/\s+/g, ' ').trim();
@@ -836,8 +841,9 @@
       const tag = lead && CALLED.has(st) ? `<span class="tick tick-${st}" title="${CALL_LABEL[st].replace(/&[^;]+;\s*/g, '')}">&#10003;</span>` : '';
       return `<div class="pc${lead ? ' first' : ''}" data-fk="${k}" title="${esc(c.name)}: ${fmt(c.votes)} votes (${pct(c.pct, 2)})">
         <span class="pc-rank">${counting ? i + 1 : ''}</span>${star(watchKey(r, c.name))}
-        <span class="pc-av">${avatar('mayor', c.name, col)}${incTag(r, c.name, { short: true })}</span>
+        ${avatar('mayor', c.name, col)}
         <div class="pc-name">${esc(c.name)}</div>${tag}
+        <div class="pc-role">${incLabel(r, c.name)}</div>
         ${counting ? `<div class="pc-nums"><b data-ok="pp|${k}">${pct(c.pct)}</b><span data-ok="pv|${k}">${fmt(c.votes)}</span></div>
         <div class="pc-delta"><span class="delta">${c.delta ? `+${fmt(c.delta)}` : ''}</span></div>
         <div class="pc-bar"><i data-bk="${k}" style="width:${(c.pct / max) * 100}%;${col ? `background:${col}` : ''}"></i></div>` : '<div class="pc-wait">No votes yet</div>'}
@@ -936,7 +942,7 @@
       const ring = colour ? (r.tied ? css('--other') : candColour(c.name) || css('--other')) : null;
       const badge = colour ? '' : `<span class="sb sb-${CALLED.has(st) ? st : 'pending'}">${st === 'projected' ? '&#10003;' : CALLED.has(st) ? '&#10003;' : ''}</span>`;
       const name = r.tied ? `Tied: ${esc(c.name)} &amp; ${esc(r.cands[1].name)}` : esc(c.name);
-      return `<span class="who"><span class="avw">${avatar(r.pkey, c.name, ring)}${badge}</span><span class="who-n">${name}${r.tied ? '' : incTag(r, c.name, { short: true })}</span></span>`;
+      return `<span class="who"><span class="avw">${avatar(r.pkey, c.name, ring)}${badge}</span><span class="who-n">${name}${r.tied ? '' : incTag(r, c.name)}</span></span>`;
     };
     t.innerHTML = `<thead><tr>${COLS.map((c) => `<th data-k="${c.key}"${c.n ? ' class="n"' : ''}${sort.key === c.key ? ` aria-sort="${sort.dir > 0 ? 'ascending' : 'descending'}"` : ''}>${c.label}</th>`).join('')}</tr></thead>
       <tbody>${rows.map((w) => {
@@ -1015,7 +1021,7 @@
         ${star(wk)}${avatar(r.pkey, c.name, rk === 'mayor|city' ? candColour(c.name) : null)}
         <div class="wc-name">${esc(c.name)}${won ? `<span class="tick tick-${st}" title="${CALL_LABEL[st].replace(/&[^;]+;\s*/g, '')}">&#10003;</span>` : ''}</div>
         <div class="wc-pos">${counting ? `${tied ? 'T-' : ''}${ordinal(rank)} <span>of ${r.cands.length}</span>` : `<span>${r.cands.length} running</span>`}</div>
-        <div class="wc-race"><span class="nm-t">${esc(w.label)}</span>${incTag(r, c.name, { short: true })}</div>
+        <div class="wc-race"><span class="nm-t">${esc(incLabel(r, c.name) ? `${w.label.replace(' · city-wide', '')} · ${incLabel(r, c.name)}` : w.label)}</span></div>
         <div class="wc-votes">${counting ? `${fmt(c.votes)} · <b>${pct(c.pct)}</b>` : ''}</div>
         <div class="wc-gap${cls}">${gap}</div>
       </div>`;
