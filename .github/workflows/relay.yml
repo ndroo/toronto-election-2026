@@ -5,8 +5,8 @@ name: Relay results feed
 on:
   workflow_dispatch:
   schedule:
-    # Every 10 min, Oct 26-28. Only one run is active at a time (see concurrency);
-    # each run polls for ~55 min, so these are mostly restarts and backups.
+    # Every 10 min, Oct 26-28, as a backup to the self-restart below. One run at a time (see concurrency);
+    # each run polls for up to ~5h40m (GitHub caps jobs at 6h).
     - cron: "*/10 * 26-28 10 *"
 
 concurrency:
@@ -15,11 +15,12 @@ concurrency:
 
 permissions:
   contents: write
+  actions: write # to start the next run (see the last step)
 
 jobs:
   relay:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 350
     steps:
       - uses: actions/checkout@v4
         with:
@@ -27,6 +28,16 @@ jobs:
       - name: Poll and publish
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          DURATION: "3300"
+          DURATION: "20400"
           INTERVAL: "45"
         run: python3 scripts/relay.py
+      # GitHub's schedule above is unreliable (it can skip for hours), so each run starts the next
+      # itself until the election window is over. Concurrency queues it behind this one.
+      - name: Start the next run
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if [ "$(date -u +%Y%m%d)" -le 20261028 ]; then
+            gh workflow run relay.yml --repo "$GITHUB_REPOSITORY" --ref main
+          fi
