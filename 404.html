@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Toronto 2026 Election Results</title>
+<link rel="canonical" href="https://torontoelections.andrewmcgrath.info/">
+<meta name="description" content="Live unofficial results for Toronto mayor, city council and school trustees, ward by ward. This page has moved to torontoelections.andrewmcgrath.info.">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Toronto 2026 Election Results">
+<meta property="og:description" content="Live unofficial results for Toronto mayor, city council and school trustees, ward by ward, with projections as polls report.">
+<meta property="og:url" content="https://torontoelections.andrewmcgrath.info/">
+<meta property="og:image" content="https://torontoelections.andrewmcgrath.info/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://torontoelections.andrewmcgrath.info/og.png">
+<meta http-equiv="refresh" content="3; url=https://torontoelections.andrewmcgrath.info/">
+<script>
+  // The results page moved. Carry this browser's saved settings (watched candidates, theme, ward...) along in the
+  // URL fragment, which is never sent to a server; the new page stores them and removes them from the address.
+  (function () {
+    var KEYS = ['watch', 'theme', 'myWard', 'lastWard', 'openWards', 'cityView', 'faces', 'ticker', 'feedSeen', 'viewer', 'welcomed'];
+    var data = {}, n = 0;
+    try { KEYS.forEach(function (k) { var v = localStorage.getItem(k); if (v != null) { data[k] = v; n++; } }); } catch (e) {}
+    var parts = [];
+    var h = location.hash.slice(1);
+    if (h) parts.push(h);
+    if (n) { try { parts.push('migrate=' + encodeURIComponent(btoa(unescape(encodeURIComponent(JSON.stringify(data)))))); } catch (e) {} }
+    location.replace('https://torontoelections.andrewmcgrath.info/' + location.search + (parts.length ? '#' + parts.join('&') : ''));
+  })();
+</script>
+<style>body { font: 16px/1.5 system-ui, -apple-system, sans-serif; margin: 0; display: grid; place-items: center; min-height: 100vh; background: #f9f9f7; color: #0b0b0b; } a { color: #2a78d6; }</style>
+</head>
+<body>
+<p>The Toronto 2026 election results have moved to <a href="https://torontoelections.andrewmcgrath.info/">torontoelections.andrewmcgrath.info</a>.</p>
+</body>
+</html>
