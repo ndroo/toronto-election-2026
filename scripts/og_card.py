@@ -28,7 +28,7 @@ svg path {{ stroke: #f9f9f7; stroke-width: 2.2; stroke-linejoin: round; }}
   <h1>Toronto 2026 election results</h1>
   <p>Mayor, council and school trustees, ward by ward, with live projections as polls report.</p>
 </div>
-<div class="url">ndroo.github.io/toronto-election-2026</div>
+<div class="url">torontoelections.andrewmcgrath.info</div>
 <svg viewBox="0 0 {wards["w"]} {wards["h"]}">{paths}</svg>
 </body></html>'''
 out = root / 'dev' / 'og.html'

@@ -13,7 +13,7 @@ import INCUMBENTS from '../incumbents.json';
 
 const UPSTREAM = 'https://mediaresults.toronto.ca/results';
 const FILES = new Set(['/unofficialresult.json', '/unofficialresult-wardbyward.json']);
-const ORIGINS = ['https://ndroo.github.io', 'http://localhost:8765'];
+const ORIGINS = ['https://ndroo.github.io', 'https://torontoelections.andrewmcgrath.info', 'https://toronto-election-site.andrewjohnmcgrath.workers.dev', 'http://localhost:8765'];
 const CACHE_MS = 15000;
 const FLUSH_MS = 10000;
 const LIVE_MS = 90000; // the page polls every 30 s, so a viewer missing for 90 s has left

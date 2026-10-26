@@ -311,7 +311,7 @@
       <p><b>Counting viewers.</b> To see how many people are using the page, your browser makes up a random code (like <code>3f9a0c71b2e48d65</code>) and sends it along when it checks for new results. It isn't linked to your name, account, location or anything else about you; it only lets us count how many browsers have the page open right now and over the last day. The codes are deleted after 24 hours. Only the totals are kept.</p>
       <p><b>Saved in your browser only.</b> Your watched candidates, theme, ticker setting, ward (if you used "Find my ward"), last ward viewed, open ward tabs, view choices and the random code are kept in your browser's local storage, on your device. They're never sent anywhere except the random code above. Clear this site's data in your browser to remove them all.</p>
       <p><b>Your location</b> never leaves your device. See <a href="#" data-jump="m-location">Your location</a>.</p>
-      <p><b>Hosting.</b> The page is served by GitHub Pages, and results pass through a small Cloudflare Worker (or GitHub if that fails). Like any website host, they receive your IP address and browser details to deliver the page, under their own policies (<a href="https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement">GitHub</a>, <a href="https://www.cloudflare.com/privacypolicy/">Cloudflare</a>). We don't collect or keep those request logs. Candidate photos are served from this site, and there are no outside fonts or scripts.</p>
+      <p><b>Hosting.</b> The page is served by Cloudflare, and results pass through a small Cloudflare Worker (or a copy kept on GitHub if that fails). Like any website host, they receive your IP address and browser details to deliver the page, under their own policies (<a href="https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement">GitHub</a>, <a href="https://www.cloudflare.com/privacypolicy/">Cloudflare</a>). We don't collect or keep those request logs. Candidate photos are served from this site, and there are no outside fonts or scripts.</p>
       </section>
 
       <section id="m-limits"><h3>Limits</h3>
@@ -1501,7 +1501,7 @@
     dark: ['Dark', '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M13.5 10.2A6 6 0 0 1 5.8 2.5a6 6 0 1 0 7.7 7.7z" fill="currentColor"/></svg>'],
   };
   // Share: the device's own share sheet where there is one (iOS, Android, most desktops), else copy the link.
-  const SHARE_URL = 'https://ndroo.github.io/toronto-election-2026/';
+  const SHARE_URL = 'https://torontoelections.andrewmcgrath.info/';
   const apple = /iPhone|iPad|iPod|Macintosh/.test(navigator.userAgent);
   $('#shareIco').innerHTML = apple
     ? '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5v8.5M5 4.5l3-3 3 3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M5.5 7H4a1 1 0 0 0-1 1v5.5a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V8a1 1 0 0 0-1-1h-1.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>'
@@ -1555,7 +1555,7 @@
       g.fillStyle = v('--ink-2'); g.fillText(hi, x, ky);
     }
     g.font = font(500, 15); g.fillStyle = v('--muted');
-    g.fillText('ndroo.github.io/toronto-election-2026 · City of Toronto unofficial results', pad, H - 30);
+    g.fillText('torontoelections.andrewmcgrath.info · City of Toronto unofficial results', pad, H - 30);
     const blob = await new Promise((res) => cv.toBlob(res, 'image/png'));
     const name = `toronto-2026-${mode === 'support' ? `support-${supportName().toLowerCase().replace(/\W+/g, '-')}` : mode}.png`;
     const file = new File([blob], name, { type: 'image/png' });
