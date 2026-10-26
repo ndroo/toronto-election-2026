@@ -1400,13 +1400,31 @@
     light: ['Light', '<svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="3" fill="currentColor"/><path d="M8 1v2M8 13v2M1 8h2M13 8h2M3.05 3.05l1.4 1.4M11.55 11.55l1.4 1.4M3.05 12.95l1.4-1.4M11.55 4.45l1.4-1.4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>'],
     dark: ['Dark', '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M13.5 10.2A6 6 0 0 1 5.8 2.5a6 6 0 1 0 7.7 7.7z" fill="currentColor"/></svg>'],
   };
+  // Share: the device's own share sheet where there is one (iOS, Android, most desktops), else copy the link.
+  const SHARE_URL = 'https://ndroo.github.io/toronto-election-2026/';
+  const apple = /iPhone|iPad|iPod|Macintosh/.test(navigator.userAgent);
+  $('#shareIco').innerHTML = apple
+    ? '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5v8.5M5 4.5l3-3 3 3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M5.5 7H4a1 1 0 0 0-1 1v5.5a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V8a1 1 0 0 0-1-1h-1.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>'
+    : '<svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="12" cy="3.5" r="2" fill="currentColor"/><circle cx="4" cy="8" r="2" fill="currentColor"/><circle cx="12" cy="12.5" r="2" fill="currentColor"/><path d="M10.2 4.5 5.8 7M5.8 9l4.4 2.5" stroke="currentColor" stroke-width="1.4"/></svg>';
+  let toastTimer;
+  const toast = (msg) => { const t = $('#toast'); t.textContent = msg; t.classList.add('on'); clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('on'), 2200); };
+  $('#shareBtn').setAttribute('aria-label', 'Share this page'); $('#shareBtn').title = 'Share this page';
+  $('#shareBtn').addEventListener('click', async () => {
+    const data = { title: 'Toronto 2026 Election Results', text: 'Live Toronto election results, ward by ward. Ad-free.', url: SHARE_URL };
+    if (navigator.share && (!navigator.canShare || navigator.canShare(data))) {
+      try { await navigator.share(data); } catch (e) { if (e.name !== 'AbortError') toast("Couldn't open sharing"); }
+      return;
+    }
+    try { await navigator.clipboard.writeText(SHARE_URL); toast('Link copied'); }
+    catch { prompt('Copy this link:', SHARE_URL); }
+  });
   const themeOrder = ['auto', 'light', 'dark'];
   let theme = THEMES[store.get('theme')] ? store.get('theme') : 'auto';
   function applyTheme() {
     if (theme === 'auto') delete document.documentElement.dataset.theme; else document.documentElement.dataset.theme = theme;
     const [label, icon] = THEMES[theme];
     const next = themeOrder[(themeOrder.indexOf(theme) + 1) % 3];
-    $('#themeBtn').innerHTML = `${icon}<span>${label}</span>`;
+    $('#themeBtn').innerHTML = `${icon}<span class="lbl">${label}</span>`;
     $('#themeBtn').setAttribute('aria-label', `Theme: ${label}. Switch to ${THEMES[next][0]}`);
     $('#themeBtn').title = `Theme: ${label}${theme === 'auto' ? ' (follows your device)' : ''} · click for ${THEMES[next][0]}`;
   }
