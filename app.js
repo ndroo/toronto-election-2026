@@ -25,6 +25,15 @@
         { id: 'raw', url: `https://raw.githubusercontent.com/${OWNER}/${REPO}/data/bundle.json` },
       ];
   const STALE_MS = 7 * 60 * 1000;
+  // Anonymous random id per browser, sent to the Worker so it can count live and daily viewers.
+  const VIEWER = (() => {
+    const fresh = () => Array.from(crypto.getRandomValues(new Uint8Array(8)), (b) => b.toString(16).padStart(2, '0')).join('');
+    try {
+      let v = localStorage.getItem('viewer');
+      if (!/^[0-9a-f]{16}$/.test(v || '')) localStorage.setItem('viewer', (v = fresh()));
+      return v;
+    } catch { return fresh(); }
+  })();
   // Race-call thresholds. The About tab explains them using these same values.
   const CALL = { minReporting: 0.25, safety: 1.5, needShare: 0.75, swing: 0.30 };
   // The City's feed never marks results official. When the City Clerk certifies the election,
@@ -349,7 +358,8 @@
         if (src.base) {
           // Cloudflare Worker: CORS pass-through of the two City files, fetched in parallel.
           const get = async (f) => {
-            const r = await fetch(`${src.base}/${f}`, { cache: 'no-cache', signal: AbortSignal.timeout(10000) });
+            const q = f === 'unofficialresult.json' ? `?v=${VIEWER}` : '';
+            const r = await fetch(`${src.base}/${f}${q}`, { cache: 'no-cache', signal: AbortSignal.timeout(10000) });
             if (!r.ok) throw new Error(`${src.id}: HTTP ${r.status}`);
             return { json: await r.json(), at: r.headers.get('X-Fetched-At') };
           };
