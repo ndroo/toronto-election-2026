@@ -90,7 +90,7 @@
     set: (k, v) => { try { localStorage.setItem(k, v); } catch {} },
   };
   let myWard = store.get('myWard');
-  let pinned = hash.get('w') || store.get('lastWard') || myWard || '1';
+  let pinned = hash.get('w') || params.get('w') || store.get('lastWard') || myWard || '1';
   let userPinned = false; // set once the person picks a ward themselves this visit
   let hover = null;
   let sort = { key: 'num', dir: 1 };
@@ -1040,6 +1040,7 @@
         <div class="wc-race"><span class="nm-t">${esc(incLabel(r, c.name) ? `${w.label.replace(' · city-wide', '')} · ${incLabel(r, c.name)}` : w.label)}</span></div>
         <div class="wc-votes">${counting ? `${fmt(c.votes)} · <b>${pct(c.pct)}</b>` : ''}</div>
         <div class="wc-gap${cls}">${gap}</div>
+        <button type="button" class="wc-share" data-follow="${esc(followLink(rk, c.name))}" data-name="${esc(c.name)}" aria-label="Share a link to follow ${esc(c.name)}" title="Share a link to follow ${esc(c.name)}">${$('#shareIco').innerHTML}</button>
       </div>`;
     }).join('');
   }
@@ -1058,11 +1059,23 @@
       const wk = watchKey(r, c.name);
       if (!watch.includes(wk)) toggleWatch(wk);
       toast(`Watching ${c.name}`);
-      saveHash(); // the link has done its job; a refresh won't re-add someone you've since removed
+      tidyFollowLink();
       return;
     }
     toast(`Couldn't find a candidate called "${want.replace(/-/g, ' ')}"`);
+    tidyFollowLink();
+  }
+  // The link has done its job: drop w/watch from the address so a refresh won't re-add someone you've removed.
+  function tidyFollowLink() {
+    const q = new URLSearchParams(location.search);
+    q.delete('w'); q.delete('watch');
+    history.replaceState(null, '', location.pathname + (q.toString() ? `?${q}` : ''));
     saveHash();
+  }
+  // A follow link for a watched candidate; the site gives these their own link preview.
+  function followLink(rk, name) {
+    const [kind, num] = rk.split('|');
+    return `${SHARE_URL}?${kind === 'council' ? `w=${num}&` : ''}watch=${slug(name)}`;
   }
   function toggleWatch(wk) {
     watch = watch.includes(wk) ? watch.filter((x) => x !== wk) : [...watch, wk].slice(-MAX_WATCH);
@@ -1078,6 +1091,8 @@
   document.addEventListener('click', (e) => {
     const s = e.target.closest('.star');
     if (s) { e.preventDefault(); e.stopPropagation(); toggleWatch(s.dataset.watch); return; }
+    const f = e.target.closest('.wc-share');
+    if (f) { e.preventDefault(); e.stopPropagation(); shareFollow(f.dataset.follow, f.dataset.name); return; }
     const g = e.target.closest('#watch [data-go]');
     if (g && model) watchedRace(g.dataset.go)?.go();
   }, true);
@@ -1606,6 +1621,11 @@
     toast('Map image saved');
   }
   $('#legend').addEventListener('click', (e) => { if (e.target.id === 'saveMap') saveMapImage().catch((err) => { console.warn('[map image]', err); toast("Couldn't make the image"); }); });
+  async function shareFollow(url, name) {
+    const data = { title: `Follow ${name} · Toronto 2026 election results`, text: `Live results for ${name}`, url };
+    if (navigator.share && (!navigator.canShare || navigator.canShare(data))) { try { await navigator.share(data); } catch {} return; }
+    try { await navigator.clipboard.writeText(url); toast(`Link to follow ${name} copied`); } catch { prompt('Copy this link:', url); }
+  }
   $('#shareBtn').setAttribute('aria-label', 'Share this page'); $('#shareBtn').title = 'Share this page';
   $('#shareBtn').addEventListener('click', async () => {
     const data = { title: 'Toronto 2026 Election Results', text: 'Live Toronto election results, ward by ward. Ad-free.', url: SHARE_URL };

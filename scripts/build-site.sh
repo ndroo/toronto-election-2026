@@ -6,5 +6,6 @@ cd "$(dirname "$0")/.."
 rm -rf dist && mkdir -p dist/worker
 cp index.html app.js wards.json photos.json incumbents.json og.png favicon.svg favicon-48.png apple-touch-icon.png dist/
 cp -R photos dist/photos
+cp -R og dist/og
 cp worker/feed.js dist/worker/feed.js
 echo "built dist/ ($(du -sh dist | cut -f1))"

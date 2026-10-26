@@ -481,7 +481,6 @@ svg#map .me-halo { fill: var(--proj); opacity: .25; transform-box: fill-box; tra
 .welcome-body { padding: 22px 24px 6px; overflow-y: auto; min-height: 0; overscroll-behavior: contain; }
 .welcome-foot { flex: none; padding: 12px 24px 14px; border-top: 1px solid var(--grid); background: var(--surface); }
 .welcome-foot .welcome-fine { margin: 8px 0 0; }
-}
 #welcome h2 { margin: 0 0 8px; font-size: 20px; letter-spacing: -0.01em; }
 #welcome p { margin: 0 0 10px; color: var(--ink-2); line-height: 1.5; }
 #welcome a { color: var(--ink); }
@@ -541,7 +540,7 @@ svg#map .me-halo { fill: var(--proj); opacity: .25; transform-box: fill-box; tra
 .watch-hint { font-size: 11px; color: var(--muted); }
 .watch-list { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; }
 .watch-list::-webkit-scrollbar { display: none; }
-.wc { flex: none; display: grid; grid-template-columns: 18px 30px minmax(0, 1fr) auto; grid-template-areas: "s a n p" "s a r v" "s a g g"; gap: 0 8px; align-items: center; width: 300px; padding: 6px 10px 6px 6px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); cursor: pointer; text-align: left; line-height: 1.3; }
+.wc { flex: none; display: grid; grid-template-columns: 18px 30px minmax(0, 1fr) auto; grid-template-areas: "s a n p" "s a r v" "s a g x"; gap: 0 8px; align-items: center; width: 300px; padding: 6px 10px 6px 6px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); cursor: pointer; text-align: left; line-height: 1.3; }
 .wc:hover { border-color: color-mix(in srgb, var(--ink) 25%, transparent); }
 .wc:focus-visible { outline: 2px solid var(--s1); outline-offset: 1px; }
 .wc .star { grid-area: s; opacity: 1; }
@@ -679,6 +678,12 @@ body.watching .toast { bottom: 120px; }
   .cd-label { font-size: 11px; }
   .welcome-fine { margin: 4px 0 6px !important; }
   .welcome-actions .btn { padding: 10px 14px; }
+}
+
+.wc-share { grid-area: x; justify-self: end; display: grid; place-items: center; width: 24px; height: 22px; padding: 0; border: 0; border-radius: 6px; background: none; color: var(--muted); cursor: pointer; position: relative; }
+.wc-share::after { content: ""; position: absolute; inset: -6px; }
+.wc-share svg { width: 13px; height: 13px; }
+.wc-share:hover { color: var(--s1); background: var(--surface-2); }
 </style>
 </head>
 <body>
@@ -826,6 +831,6 @@ body.watching .toast { bottom: 120px; }
 
 <div id="tip" role="tooltip"></div>
 <div id="callTip" role="tooltip"></div>
-<script src="app.js?v=20261026-wl1"></script>
+<script src="app.js?v=20261026-fl2"></script>
 </body>
 </html>
