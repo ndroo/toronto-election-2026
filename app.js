@@ -259,7 +259,7 @@
 
       <section id="m-photos"><h3>Candidate photos</h3>
       <p>Photos were taken from each candidate's own campaign website or social page, as listed on the <a href="https://www.toronto.ca/city-government/elections/candidate-list/">City's candidate list</a>, and cropped automatically around the face. Each crop was then checked by hand, and images that weren't clearly a headshot of the candidate were dropped. Candidates without a usable photo are shown with their initials. If a photo is wrong, contact <a href="https://andrewmcgrath.info">Andrew McGrath</a>.</p>
-      <p>On the map, the Mayor and Council views show the leading candidate's photo at each ward's centre. Wards whose leader has no photo show just the ward number. Use the Faces switch under the map to turn photos off.</p>
+      <p>On the map, the Mayor and Council views show the leading candidate's photo at each ward's centre. Where we have no photo of the leader, their initials are shown instead. Use the Faces switch under the map to turn photos off.</p>
       </section>
 
       <section id="m-limits"><h3>Limits</h3>
@@ -362,7 +362,14 @@
     const rnd = (s) => { let h = 2166136261; for (const ch of s) h = Math.imul(h ^ ch.charCodeAt(0), 16777619); return ((h >>> 0) % 10000) / 10000; };
     // Candidates with a campaign photo tend to be the established campaigns, so the demo favours them.
     const hasPhoto = (name) => Object.keys(photos).some((k) => k.endsWith(`|${normName(name)}`));
-    const weight = (name, ward) => (Math.pow(rnd(name), 6) * 8 + rnd(name + ward) * 0.6 + 0.02) * (hasPhoto(name) ? 3 + rnd(name + 'p') * 6 : 1);
+    // Each candidate gets a random home base on the map; support falls off with distance, so leaders vary by area.
+    const near = (name, key) => {
+      const g = geo?.wards[key.split('|')[1]];
+      if (!g) return 1;
+      const d = Math.hypot(g.lx - rnd(name + 'x') * geo.w, g.ly - rnd(name + 'y') * geo.h);
+      return 0.35 + 3 * Math.exp(-d / 260);
+    };
+    const weight = (name, ward) => (Math.pow(rnd(name), 6) * 8 + rnd(name + ward) * 0.6 + 0.02) * (hasPhoto(name) ? 3 + rnd(name + 'p') * 6 : 1) * near(name, ward);
     const fill = (w, cands, key, p) => {
       w.pollsReceived = String(Math.min(int(w.polls), Math.round(int(w.polls) * clamp(p + (rnd(key.replace(/^\w+\|/, '')) - 0.5) * 0.3))));
       const cast = Math.round(int(w.totalVoters) * 0.33 * (int(w.pollsReceived) / Math.max(1, int(w.polls))));
@@ -406,6 +413,7 @@
       assignColours();
       renderAll();
       maybeWelcome();
+      renderWelcome();
     } catch (e) {
       lastErr = e;
       console.warn('[results]', e);
@@ -499,8 +507,7 @@
     renderLegend();
   }
 
-  // Leader's photo at each ward's centre (mayor and council views).
-  // Wards whose leader has no photo just show the ward number.
+  // Leader's photo at each ward's centre (mayor and council views), or their initials if we have no photo.
   let showFaces = true;
   try { showFaces = localStorage.getItem('faces') !== 'off'; } catch {}
   function renderFaces() {
@@ -512,7 +519,7 @@
       const r = on ? (mode === 'mayor' ? model.wards[num]?.mayor : model.wards[num]?.council) : null;
       const a = r?.leader && !r.tied ? r.cands[0] : null;
       const pa = a && photoOf(r.pkey, a.name);
-      if (!pa) { lbl.setAttribute('y', g.ly); lbl.classList.remove('small'); continue; }
+      if (!a) { lbl.setAttribute('y', g.ly); lbl.classList.remove('small'); continue; }
       const r1 = clamp(wardSize[num] * 0.15, 16, 28);
       const faces = [{ c: a, ph: pa, rad: r1, x: g.lx, y: g.ly, lead: true }];
       for (const f of faces) {
@@ -520,8 +527,9 @@
         const id = `fc${clipId++}`;
         parts.push(`<g class="face"><title>${esc(f.c.name)} ${pct(f.c.pct)}</title>
           <circle cx="${f.x}" cy="${f.y}" r="${f.rad + 2.5}" fill="${ring}"/>
-          <clipPath id="${id}"><circle cx="${f.x}" cy="${f.y}" r="${f.rad}"/></clipPath>
-          <image href="photos/${f.ph.f}" x="${f.x - f.rad}" y="${f.y - f.rad}" width="${f.rad * 2}" height="${f.rad * 2}" clip-path="url(#${id})" preserveAspectRatio="xMidYMid slice"/></g>`);
+          ${f.ph ? `<clipPath id="${id}"><circle cx="${f.x}" cy="${f.y}" r="${f.rad}"/></clipPath>
+          <image href="photos/${f.ph.f}" x="${f.x - f.rad}" y="${f.y - f.rad}" width="${f.rad * 2}" height="${f.rad * 2}" clip-path="url(#${id})" preserveAspectRatio="xMidYMid slice"/>`
+          : `<circle cx="${f.x}" cy="${f.y}" r="${f.rad}" class="face-i"/><text x="${f.x}" y="${f.y}" class="face-t" style="font-size:${f.rad * 0.62}px">${esc(initials(f.c.name))}</text>`}</g>`);
       }
       lbl.setAttribute('y', g.ly + r1 + 11); lbl.classList.add('small');
     }
@@ -799,28 +807,48 @@
   }
 
   // ---------- welcome dialog ----------
-  // Shown once per tab. Before any polls report it offers the demo or waiting for live results.
+  // Shown once per tab. Before results it is a live countdown to polls closing, then a "waiting for the
+  // first results" screen, and it closes itself as soon as the first results arrive.
   const POLLS_CLOSE = Date.parse('2026-10-26T20:00:00-04:00');
-  let welcomed = false;
+  let welcomed = false, welcomeTimer = null;
+  const hasResults = () => !!model && model.mayor.pollsReceived > 0;
+  function welcomePhase() {
+    if (hasResults()) return 'results';
+    return Date.now() < POLLS_CLOSE ? 'countdown' : 'waiting';
+  }
+  function renderWelcome() {
+    const dlg = $('#welcome');
+    if (!dlg.open) return;
+    const phase = welcomePhase();
+    if (phase === 'results' && dlg.dataset.phase && dlg.dataset.phase !== 'results') { dlg.close(); return; } // first results just arrived
+    dlg.dataset.phase = phase;
+    const box = $('#welcomeWait');
+    box.hidden = phase === 'results';
+    $('#welcomeDemo').hidden = phase === 'results';
+    $('#welcomeGo').textContent = phase === 'results' ? 'View results' : 'Look around now';
+    if (phase === 'countdown') {
+      const sec = Math.max(0, Math.floor((POLLS_CLOSE - Date.now()) / 1000));
+      const hh = Math.floor(sec / 3600), mm = String(Math.floor((sec % 3600) / 60)).padStart(2, '0'), ss = String(sec % 60).padStart(2, '0');
+      box.innerHTML = `<div class="cd-label">Polls close at 8 p.m. in</div>
+        <div class="cd">${hh}<small>h</small> ${mm}<small>m</small> ${ss}<small>s</small></div>
+        <p>Keep this open and it will switch to live results by itself once counting starts.</p>`;
+    } else if (phase === 'waiting') {
+      box.innerHTML = `<div class="cd-label">Polls are closed</div>
+        <div class="cd-wait"><span class="spinner" aria-hidden="true"></span>Waiting for the first results to come in&hellip;</div>
+        <p>The City usually starts reporting shortly after 8 p.m. This will close by itself when they arrive.</p>`;
+    }
+  }
   function maybeWelcome() {
     if (welcomed || DEMO) return;
     welcomed = true;
     try { if (sessionStorage.getItem('welcomed')) return; sessionStorage.setItem('welcomed', '1'); } catch {}
     const dlg = $('#welcome');
     if (!dlg?.showModal) return;
-    const waiting = !model || model.mayor.pollsReceived === 0;
-    $('#welcomeWait').hidden = !waiting;
-    $('#welcomeDemo').hidden = !waiting;
-    $('#welcomeGo').textContent = waiting ? 'Wait for live results' : 'View results';
-    const tickDown = () => {
-      const ms = POLLS_CLOSE - Date.now();
-      $('#countdown').textContent = ms > 0 ? `in ${Math.floor(ms / 3600e3)}h ${Math.floor((ms % 3600e3) / 60e3)}m` : '- counting has started';
-    };
-    tickDown();
-    const t = setInterval(tickDown, 30000);
-    dlg.addEventListener('close', () => clearInterval(t), { once: true });
+    dlg.addEventListener('close', () => clearInterval(welcomeTimer), { once: true });
     dlg.addEventListener('click', (e) => { if (e.target === dlg) dlg.close(); }); // click outside closes
     dlg.showModal();
+    renderWelcome();
+    welcomeTimer = setInterval(renderWelcome, 1000);
     $('#welcomeGo').focus();
   }
 

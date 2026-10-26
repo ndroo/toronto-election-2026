@@ -314,8 +314,14 @@ footer.disclaimer a, footer.disclaimer .linkish { color: var(--ink-2); font-size
 .welcome-wait { background: var(--surface-2); border-radius: 10px; padding: 12px 14px; margin: 4px 0 14px; }
 .welcome-wait p { margin: 0 0 4px; }
 .welcome-wait p:last-child { margin: 0; }
-.countdown { color: var(--ink) !important; font-variant-numeric: tabular-nums; }
-.countdown span { color: var(--ink-2); margin-left: 6px; }
+.welcome-wait { text-align: center; padding: 16px 14px 14px; }
+.cd-label { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 600; }
+.cd { font-size: 40px; font-weight: 700; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; margin: 4px 0 6px; color: var(--ink); }
+.cd small { font-size: 18px; font-weight: 600; color: var(--muted); margin-left: 1px; }
+.cd-wait { font-size: 17px; font-weight: 650; margin: 8px 0 8px; display: flex; align-items: center; justify-content: center; gap: 10px; color: var(--ink); }
+.spinner { width: 18px; height: 18px; border: 2.5px solid var(--axis); border-top-color: var(--proj); border-radius: 50%; animation: spin .9s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .spinner { animation-duration: 3s; } }
 .welcome-actions { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; }
 .btn { font: 600 14px/1 system-ui, -apple-system, "Segoe UI", sans-serif; padding: 10px 16px; border-radius: 8px; border: 1px solid var(--axis); background: var(--surface); color: var(--ink) !important; cursor: pointer; text-decoration: none; }
 .btn:hover { background: var(--surface-2); }
@@ -411,10 +417,7 @@ footer.disclaimer a, footer.disclaimer .linkish { color: var(--ink-2); font-size
       <li><b>Race calls</b> like <span class="call call-projected">&#9670; Projected winner</span> are this page's own estimates. Hover any badge to see why, or read the Methodology tab.</li>
       <li>Results are unofficial until certified by the City Clerk. See <a href="https://www.toronto.ca/city-government/elections/">toronto.ca/elections</a> for official results.</li>
     </ul>
-    <div id="welcomeWait" class="welcome-wait" hidden>
-      <p class="countdown"><b>Polls close at 8 p.m.</b> <span id="countdown"></span></p>
-      <p>Results start coming in shortly after. Leave this page open and it will update by itself, about every 30 seconds.</p>
-    </div>
+    <div id="welcomeWait" class="welcome-wait" aria-live="polite" hidden></div>
     <div class="welcome-actions">
       <a id="welcomeDemo" class="btn" href="?demo" hidden>Explore a demo</a>
       <button id="welcomeGo" class="btn primary" value="close">View results</button>
