@@ -57,7 +57,14 @@
   const colorOf = new Map(); // mayoral candidate name -> slot (1..3); sticky so colours follow the person
   const hash = new URLSearchParams(location.hash.slice(1));
   let mode = ['mayor', 'council', 'reporting', 'turnout'].includes(hash.get('m')) ? hash.get('m') : 'mayor';
-  let pinned = hash.get('w') || '1';
+  // Device-only memory: the ward found from location, and the last ward viewed. No coordinates are kept.
+  const store = {
+    get: (k) => { try { return localStorage.getItem(k); } catch { return null; } },
+    set: (k, v) => { try { localStorage.setItem(k, v); } catch {} },
+  };
+  let myWard = store.get('myWard');
+  let pinned = hash.get('w') || store.get('lastWard') || myWard || '1';
+  let userPinned = false; // set once the person picks a ward themselves this visit
   let hover = null;
   let sort = { key: 'num', dir: 1 };
   let tab = ['ward', 'wards', 'school', 'method'].includes(hash.get('t')) ? hash.get('t') : 'ward';
@@ -207,7 +214,7 @@
     const ex = (st) => `<span class="call call-${st}">${CALL_LABEL[st]}</span>`;
     const sections = [
       ['m-disclaimer', 'Disclaimer'], ['m-calls', 'Race calls'], ['m-data', 'Where the numbers come from'], ['m-calc', 'How each number is worked out'],
-      ['m-map', 'Map colours'], ['m-photos', 'Candidate photos'], ['m-limits', 'Limits'],
+      ['m-map', 'Map colours'], ['m-photos', 'Candidate photos'], ['m-location', 'Your location'], ['m-limits', 'Limits'],
     ];
     $('#method').innerHTML = `
       <h2>Methodology</h2>
@@ -263,6 +270,10 @@
       <section id="m-photos"><h3>Candidate photos</h3>
       <p>Photos were taken from each candidate's own campaign website or social page, as listed on the <a href="https://www.toronto.ca/city-government/elections/candidate-list/">City's candidate list</a>, and cropped automatically around the face. Each crop was then checked by hand, and images that weren't clearly a headshot of the candidate were dropped. Candidates without a usable photo are shown with their initials. If a photo is wrong, contact <a href="https://andrewmcgrath.info">Andrew McGrath</a>.</p>
       <p>On the map, the Mayor and Council views show the leading candidate's photo at each ward's centre. Where we have no photo of the leader, their initials are shown instead. Use the Faces switch under the map to turn photos off.</p>
+      </section>
+
+      <section id="m-location"><h3>Your location</h3>
+      <p>"Find my ward" asks your browser for your location once, and matches it against the ward map on your own device. Your location is never sent to us or anyone else, and it isn't stored. Only your ward number is saved in your browser, so the page can open on your ward next time. Clear your browser's site data to forget it. Ward edges on the map are simplified, so if you're right on a boundary, double-check your ward with the <a href="https://www.toronto.ca/city-government/elections/">City</a>.</p>
       </section>
 
       <section id="m-limits"><h3>Limits</h3>
@@ -444,7 +455,7 @@
   const NS = 'http://www.w3.org/2000/svg';
   const paths = {};
   const wardSize = {};
-  let faceLayer;
+  let faceLayer, meLayer;
   let hl, pin;
   function buildMap() {
     svg.setAttribute('viewBox', `0 0 ${geo.w} ${geo.h}`);
@@ -473,7 +484,8 @@
     const defs = document.createElementNS(NS, 'defs');
     defs.innerHTML = '<filter id="desat"><feColorMatrix type="saturate" values="0.1"/></filter>';
     svg.append(defs);
-    svg.append(gW, pin, hl, faceLayer, gL);
+    meLayer = document.createElementNS(NS, 'g'); meLayer.setAttribute('class', 'me');
+    svg.append(gW, pin, hl, faceLayer, gL, meLayer);
     // Face size scales with the ward's footprint so small downtown wards don't overflow.
     for (const [num, p] of Object.entries(paths)) { const b = p.getBBox(); wardSize[num] = Math.sqrt(b.width * b.height); }
 
@@ -483,7 +495,7 @@
       if (n) { setHover(n); placeTip(e.clientX, e.clientY); } else setHover(null);
     });
     svg.addEventListener('pointerleave', () => setHover(null));
-    svg.addEventListener('click', (e) => { const n = e.target.dataset?.w; if (n) { setPinned(n); setTab('ward'); } });
+    svg.addEventListener('click', (e) => { const n = e.target.dataset?.w; if (n) { setPinned(n, true); setTab('ward'); } });
     svg.addEventListener('focusin', (e) => { const n = e.target.dataset?.w; if (n) { setHover(n); const r = e.target.getBoundingClientRect(); placeTip(r.right, r.top); } });
     svg.addEventListener('focusout', () => setHover(null));
     svg.addEventListener('keydown', (e) => { const n = e.target.dataset?.w; if (n && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); setPinned(n); setTab('ward'); } });
@@ -610,8 +622,10 @@
     renderTip();
     renderWard();
   }
-  function setPinned(n) {
+  function setPinned(n, byUser = false) {
     pinned = String(n);
+    store.set('lastWard', pinned);
+    if (byUser) userPinned = true;
     saveHash();
     pin.setAttribute('d', geo.wards[pinned]?.d || '');
     for (const tr of document.querySelectorAll('#wardTable tbody tr')) tr.classList.toggle('pinned', tr.dataset.w === pinned);
@@ -695,6 +709,7 @@
     el.innerHTML = `
       <div class="ward-head">
         <div class="ward-title"><span class="wn">Ward ${n}</span><span class="wname">${esc(w.name || '')}</span>
+          ${String(n) === myWard ? '<span class="you-tag">Your ward</span>' : ''}
           <span class="pinned">${hover && hover !== pinned ? 'preview · click to pin' : 'pinned'}</span></div>
         <div class="ward-sub">${rep ? `<span class="ws"><span class="wt wt-polls">${fmt(rep.pollsReceived)}/${fmt(rep.polls)} polls · ${pct(rep.polls ? (rep.pollsReceived / rep.polls) * 100 : 0, 0)}</span>${meter(rep.polls ? rep.pollsReceived / rep.polls : 0, rep.complete)}</span>
           <span class="ws"><span class="wt wt-turn">Turnout ${pct(rep.totalVoters ? (rep.votes / rep.totalVoters) * 100 : 0)}</span>${meter(rep.totalVoters ? rep.votes / rep.totalVoters : 0)}</span>
@@ -821,7 +836,7 @@
   $('#wardTable').addEventListener('click', (e) => {
     const th = e.target.closest('th');
     if (th) { const k = th.dataset.k; sort = { key: k, dir: sort.key === k ? -sort.dir : (k === 'num' ? 1 : -1) }; renderTable(); return; }
-    const tr = e.target.closest('tbody tr'); if (tr) { setPinned(tr.dataset.w); setTab('ward'); }
+    const tr = e.target.closest('tbody tr'); if (tr) { setPinned(tr.dataset.w, true); setTab('ward'); }
   });
   $('#wardTable').addEventListener('mouseover', (e) => { const tr = e.target.closest('tbody tr'); if (tr) { setHover(tr.dataset.w); tip.classList.remove('on'); } });
   $('#wardTable').addEventListener('mouseleave', () => setHover(null));
@@ -1010,6 +1025,76 @@
   $('#aboutBtn').addEventListener('click', openWelcome);
   $('#status').addEventListener('click', () => { if (!hasResults()) openWelcome(); });
 
+  // ---------- find my ward ----------
+  // The browser's location is matched against the ward shapes right here on the device; it is never sent
+  // anywhere. Only the ward number is remembered (localStorage), so returning visitors land on it.
+  let myPoint = null; // map position for the "you are here" dot, this visit only
+  function wardAt(lat, lon) {
+    const { minx, maxy, s } = geo.proj;
+    const my = (Math.log(Math.tan(Math.PI / 4 + (lat * Math.PI) / 360)) * 180) / Math.PI;
+    const pt = { x: (lon - minx) * s, y: (maxy - my) * s };
+    for (const [num, p] of Object.entries(paths)) if (p.isPointInFill(new DOMPoint(pt.x, pt.y))) return { num, pt };
+    return { num: null, pt };
+  }
+  function renderMe() {
+    meLayer.innerHTML = myPoint ? `<circle class="me-halo" cx="${myPoint.x}" cy="${myPoint.y}" r="14"/><circle class="me-dot" cx="${myPoint.x}" cy="${myPoint.y}" r="6"/>` : '';
+    $('#findWardBtn').innerHTML = myWard ? `${PIN_ICON} Your ward: ${myWard}` : `${PIN_ICON} Find my ward`;
+  }
+  function useWard(num, pt, { jump = true } = {}) {
+    myWard = String(num); store.set('myWard', myWard);
+    if (pt) myPoint = pt;
+    if (jump) { setPinned(myWard); setTab('ward'); }
+    renderMe(); renderWard();
+  }
+  function wardMsg(text) { const m = $('#wardMsg'); m.hidden = !text; m.textContent = text || ''; }
+  function locate({ quiet = false } = {}) {
+    if (!navigator.geolocation) { if (!quiet) wardMsg("This browser can't share its location. Pick your ward from the list instead."); return; }
+    const btn = $('#wardLocate');
+    if (!quiet) { btn.disabled = true; btn.textContent = 'Finding you…'; wardMsg(''); }
+    navigator.geolocation.getCurrentPosition((pos) => {
+      btn.disabled = false; btn.textContent = 'Use my location';
+      const { num, pt } = wardAt(pos.coords.latitude, pos.coords.longitude);
+      if (num) {
+        useWard(num, pt, { jump: !quiet || !userPinned });
+        if ($('#wardDlg').open) $('#wardDlg').close();
+      } else if (!quiet) {
+        wardMsg("You don't seem to be in the City of Toronto right now. Pick a ward from the list instead.");
+      }
+    }, (err) => {
+      btn.disabled = false; btn.textContent = 'Use my location';
+      if (quiet) return;
+      wardMsg(err.code === err.PERMISSION_DENIED ? 'Location access is turned off for this site. You can pick your ward from the list instead.'
+        : "Couldn't get your location just now. Try again, or pick your ward from the list.");
+    }, { enableHighAccuracy: false, timeout: 15000, maximumAge: 10 * 60 * 1000 });
+  }
+  function openWardDlg() {
+    const dlg = $('#wardDlg');
+    if (!dlg?.showModal || dlg.open || $('#welcome').open) return;
+    wardMsg('');
+    $('#wardGo').hidden = !myWard;
+    if (myWard) $('#wardGo').textContent = `Go to Ward ${myWard}`;
+    $('#wardPick').innerHTML = '<option value="">Choose a ward…</option>' + Object.entries(geo.wards)
+      .sort((a, b) => a[0] - b[0]).map(([n, w]) => `<option value="${n}"${n === myWard ? ' selected' : ''}>Ward ${n} - ${esc(w.name)}</option>`).join('');
+    dlg.showModal();
+  }
+  // 30 seconds in: if location is already allowed, quietly use it; if we've never asked, offer it once per visit.
+  async function maybeAskWard() {
+    let state = 'prompt';
+    try { state = (await navigator.permissions.query({ name: 'geolocation' })).state; } catch {}
+    if (state === 'denied') return;
+    if (state === 'granted') { locate({ quiet: true }); return; }
+    if (myWard) return; // they've told us before; we already opened on their last ward
+    try { if (sessionStorage.getItem('askedWard')) return; sessionStorage.setItem('askedWard', '1'); } catch {}
+    if ($('#welcome').open) { $('#welcome').addEventListener('close', () => setTimeout(openWardDlg, 1200), { once: true }); return; }
+    openWardDlg();
+  }
+  const PIN_ICON = '<svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true"><path d="M8 1.5a4.5 4.5 0 0 0-4.5 4.5c0 3.3 4.5 8.5 4.5 8.5s4.5-5.2 4.5-8.5A4.5 4.5 0 0 0 8 1.5Zm0 6.2a1.7 1.7 0 1 1 0-3.4 1.7 1.7 0 0 1 0 3.4Z" fill="currentColor"/></svg>';
+  $('#findWardBtn').addEventListener('click', openWardDlg);
+  $('#wardLocate').addEventListener('click', () => locate());
+  $('#wardGo').addEventListener('click', () => { setPinned(myWard, true); setTab('ward'); $('#wardDlg').close(); });
+  $('#wardPick').addEventListener('change', (e) => { if (e.target.value) { useWard(e.target.value); $('#wardDlg').close(); } });
+  $('#wardDlg').addEventListener('click', (e) => { if (e.target === $('#wardDlg')) $('#wardDlg').close(); });
+
   // ---------- boot ----------
   if (DEMO) {
     $('#demoBanner').hidden = false;
@@ -1027,8 +1112,9 @@
     if (!geo.wards[pinned]) pinned = '1';
     setTab(tab);
     renderMethod();
-    renderMap(); renderWard();
+    renderMap(); renderWard(); renderMe();
     tick();
+    setTimeout(maybeAskWard, 30000);
     setInterval(tick, POLL_MS);
     setInterval(renderStatus, 1000);
     setTimeout(maybeWelcome, 4000); // still greet people if the first load is slow or fails

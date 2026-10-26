@@ -331,6 +331,30 @@ footer.disclaimer a, footer.disclaimer .linkish { color: var(--ink-2); font-size
 .disclaimer-box p { margin: 0 0 6px; }
 .disclaimer-box p:last-child { margin: 0; }
 
+/* Find my ward */
+.find-btn { display: inline-flex; align-items: center; gap: 5px; border: 1px solid var(--border); background: var(--surface); color: var(--ink-2); border-radius: 999px; padding: 4px 11px; font: 600 12px/1.3 system-ui, -apple-system, "Segoe UI", sans-serif; cursor: pointer; white-space: nowrap; }
+.find-btn:hover { color: var(--ink); background: var(--surface-2); }
+.find-btn svg { color: var(--proj); }
+.you-tag { font-size: 11px; font-weight: 650; color: #fff; background: var(--proj); border-radius: 999px; padding: 2px 8px; align-self: center; }
+svg#map .me { pointer-events: none; }
+svg#map .me-dot { fill: var(--proj); stroke: #fff; stroke-width: 2.5; }
+svg#map .me-halo { fill: var(--proj); opacity: .25; transform-box: fill-box; transform-origin: center; animation: me-pulse 2.4s ease-out infinite; }
+@keyframes me-pulse { from { transform: scale(.6); opacity: .45; } to { transform: scale(2.2); opacity: 0; } }
+#wardDlg { border: 1px solid var(--border); border-radius: 14px; padding: 0; width: min(440px, calc(100vw - 32px)); background: var(--surface); color: var(--ink); box-shadow: 0 24px 64px rgba(0,0,0,.3); }
+#wardDlg::backdrop { background: rgba(0,0,0,.3); backdrop-filter: blur(2px); }
+#wardDlg form { padding: 22px 24px 18px; }
+#wardDlg h2 { margin: 6px 0 8px; font-size: 19px; }
+#wardDlg p { margin: 0 0 10px; color: var(--ink-2); line-height: 1.5; font-size: 14px; }
+.wd-icon { width: 42px; height: 42px; border-radius: 50%; display: grid; place-items: center; background: color-mix(in srgb, var(--proj) 14%, transparent); color: var(--proj); }
+.wd-privacy { font-size: 12.5px !important; background: var(--surface-2); border-radius: 8px; padding: 9px 11px; }
+.wd-msg { color: var(--critical) !important; font-size: 13px !important; }
+.wd-alt { display: flex; align-items: center; gap: 8px; margin-top: 14px; font-size: 12.5px; color: var(--muted); }
+.wd-alt select { flex: 1; min-width: 0; font: inherit; color: var(--ink); background: var(--surface); border: 1px solid var(--axis); border-radius: 6px; padding: 5px 6px; }
+.fade-dlg[open] { animation: dlg-in .55s cubic-bezier(.2,.8,.2,1) both; }
+.fade-dlg[open]::backdrop { animation: bd-in .55s ease both; }
+@keyframes dlg-in { from { opacity: 0; transform: translateY(10px) scale(.98); } }
+@keyframes bd-in { from { opacity: 0; } }
+
 /* Welcome dialog */
 #welcome { border: 1px solid var(--border); border-radius: 14px; padding: 0; width: min(520px, calc(100vw - 32px)); background: var(--surface); color: var(--ink); box-shadow: 0 24px 64px rgba(0,0,0,.3); }
 #welcome::backdrop { background: rgba(0,0,0,.35); backdrop-filter: blur(2px); }
@@ -397,6 +421,7 @@ footer.disclaimer a, footer.disclaimer .linkish { color: var(--ink-2); font-size
     <section class="card" id="mapCard" aria-label="Ward map">
       <div class="card-head">
         <h2>Wards</h2>
+        <button id="findWardBtn" class="find-btn" type="button">Find my ward</button>
         <div class="modes" role="group" aria-label="Map colouring">
           <button data-mode="mayor" aria-pressed="true">Mayor leader</button>
           <button data-mode="council">Council margin</button>
@@ -445,7 +470,7 @@ footer.disclaimer a, footer.disclaimer .linkish { color: var(--ink-2); font-size
   <span>Official: <a href="https://www.toronto.ca/city-government/elections/">toronto.ca/elections</a></span>
 </footer>
 
-<dialog id="welcome" aria-labelledby="welcomeTitle">
+<dialog id="welcome" class="fade-dlg" aria-labelledby="welcomeTitle">
   <form method="dialog">
     <h2 id="welcomeTitle">Toronto 2026 election results</h2>
     <p>Live, unofficial results for mayor, city council and school trustees, straight from the City of Toronto's results feed. An ad-free page by <a href="https://andrewmcgrath.info">Andrew McGrath</a>.</p>
@@ -463,8 +488,24 @@ footer.disclaimer a, footer.disclaimer .linkish { color: var(--ink-2); font-size
   </form>
 </dialog>
 
+<dialog id="wardDlg" class="fade-dlg" aria-labelledby="wardDlgTitle">
+  <form method="dialog">
+    <div class="wd-icon" aria-hidden="true"><svg viewBox="0 0 16 16" width="22" height="22"><path d="M8 1.5a4.5 4.5 0 0 0-4.5 4.5c0 3.3 4.5 8.5 4.5 8.5s4.5-5.2 4.5-8.5A4.5 4.5 0 0 0 8 1.5Zm0 6.2a1.7 1.7 0 1 1 0-3.4 1.7 1.7 0 0 1 0 3.4Z" fill="currentColor"/></svg></div>
+    <h2 id="wardDlgTitle">See your ward's results</h2>
+    <p>Jump straight to the council race where you are, and how your ward is voting for mayor.</p>
+    <p class="wd-privacy"><b>Private by design.</b> Your location is matched to the ward map right here in your browser. It's never sent anywhere, and only your ward number is remembered on this device.</p>
+    <p id="wardMsg" class="wd-msg" role="status" hidden></p>
+    <div class="welcome-actions">
+      <button class="btn" value="cancel">Not now</button>
+      <button id="wardGo" class="btn" type="button" hidden>Go to my ward</button>
+      <button id="wardLocate" class="btn primary" type="button" autofocus>Use my location</button>
+    </div>
+    <label class="wd-alt">Or choose it yourself <select id="wardPick"></select></label>
+  </form>
+</dialog>
+
 <div id="tip" role="tooltip"></div>
 <div id="callTip" role="tooltip"></div>
-<script src="app.js?v=20261026i"></script>
+<script src="app.js?v=20261026k"></script>
 </body>
 </html>
