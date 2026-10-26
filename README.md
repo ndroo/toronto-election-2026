@@ -17,6 +17,7 @@ The relay runs on a cron for Oct 26-28. To kick it manually: `gh workflow run re
 
 - `?demo` - random numbers on the real candidate lists, to preview the layout (red banner)
 - `#w=10&m=council` - pin ward 10, colour map by council margin (`mayor`, `council`, `reporting`, `turnout`)
+- `#w=10&watch=ian-cunningham` - open ward 10 and add that candidate to the watch list (names match loosely)
 - `?src=<url>` - read a bundle from another URL (local testing)
 
 Ward boundaries: Toronto Open Data, City Wards (25-ward model), simplified.

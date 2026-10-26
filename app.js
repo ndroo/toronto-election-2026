@@ -495,6 +495,7 @@
       lastOk = Date.now(); lastErr = null;
       assignColours();
       renderAll(demoQuiet);
+      applyPendingWatch();
       demoQuiet = false;
       if (DEMO) $('#demoProg').textContent = `Simulated count: ${Math.round((model.mayor.pollsReceived / model.mayor.polls) * 100)}% of polls in`;
       maybeWelcome();
@@ -1041,6 +1042,27 @@
         <div class="wc-gap${cls}">${gap}</div>
       </div>`;
     }).join('');
+  }
+  // Links like #w=10&watch=ian-cunningham open that ward and add the candidate to the watch list.
+  // Names match loosely (case, accents, spaces or hyphens); the ward's council race is searched first.
+  let pendingWatch = (hash.get('watch') || params.get('watch') || '').trim();
+  const slug = (s) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  function applyPendingWatch() {
+    if (!pendingWatch || !model) return;
+    const want = slug(pendingWatch);
+    pendingWatch = '';
+    const races = [model.wards[pinned]?.council, model.mayor, ...Object.values(model.wards).map((w) => w.council), ...model.boards.flatMap((b) => b.wards.map((w) => w.race))].filter(Boolean);
+    for (const r of races) {
+      const c = r.cands.find((x) => slug(x.name) === want);
+      if (!c) continue;
+      const wk = watchKey(r, c.name);
+      if (!watch.includes(wk)) toggleWatch(wk);
+      toast(`Watching ${c.name}`);
+      saveHash(); // the link has done its job; a refresh won't re-add someone you've since removed
+      return;
+    }
+    toast(`Couldn't find a candidate called "${want.replace(/-/g, ' ')}"`);
+    saveHash();
   }
   function toggleWatch(wk) {
     watch = watch.includes(wk) ? watch.filter((x) => x !== wk) : [...watch, wk].slice(-MAX_WATCH);
