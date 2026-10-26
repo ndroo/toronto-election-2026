@@ -7,6 +7,21 @@
 (() => {
   'use strict';
 
+  // One-time move from the old ndroo.github.io address: its redirect page passes this browser's saved
+  // settings in the URL fragment (never sent to a server). Keep them unless already set here, then tidy the URL.
+  (() => {
+    const KEYS = ['watch', 'theme', 'myWard', 'lastWard', 'openWards', 'cityView', 'faces', 'ticker', 'feedSeen', 'viewer', 'welcomed'];
+    const h = new URLSearchParams(location.hash.slice(1));
+    const m = h.get('migrate');
+    if (!m) return;
+    try {
+      const data = JSON.parse(decodeURIComponent(escape(atob(m))));
+      for (const [k, v] of Object.entries(data)) if (KEYS.includes(k) && typeof v === 'string' && localStorage.getItem(k) == null) localStorage.setItem(k, v);
+    } catch {}
+    h.delete('migrate');
+    history.replaceState(null, '', location.pathname + location.search + (h.toString() ? `#${h}` : ''));
+  })();
+
   // ---------- config ----------
   const params = new URLSearchParams(location.search);
   const DEMO = params.has('demo');
