@@ -139,6 +139,12 @@ svg#map .ward { stroke: var(--surface); stroke-width: 1.5; stroke-linejoin: roun
 svg#map.hovering .ward:not(.hot) { opacity: 0.55; }
 svg#map .hl { fill: none; stroke: var(--ink); stroke-width: 2.5; pointer-events: none; stroke-linejoin: round; }
 svg#map .pin { fill: none; stroke: var(--ink); stroke-width: 3.5; pointer-events: none; stroke-linejoin: round; }
+svg#map .faces { pointer-events: none; }
+svg#map .face { transition: opacity .2s; }
+svg#map.hovering .face { opacity: .5; }
+svg#map .face-i { fill: var(--surface-2); }
+svg#map .face-t { fill: var(--ink-2); font-weight: 700; text-anchor: middle; dominant-baseline: central; }
+svg#map .lbl.small { font-size: 11px; }
 svg#map .lbl { font-size: 15px; font-weight: 650; text-anchor: middle; dominant-baseline: central; pointer-events: none; paint-order: stroke; stroke-width: 3px; stroke-linejoin: round; }
 .legend { font-size: 12px; color: var(--ink-2); margin-top: 8px; }
 .lg-row { display: flex; gap: 6px 14px; align-items: center; height: 20px; white-space: nowrap; overflow: hidden; }
@@ -178,9 +184,12 @@ svg#map .lbl { font-size: 15px; font-weight: 650; text-anchor: middle; dominant-
 .race-head h3 { font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--ink-2); margin: 0; }
 .race-head .meta { margin-left: auto; color: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; overflow: hidden; text-overflow: ellipsis; }
 .cands { list-style: none; margin: 0; padding: 0; }
-.cand { display: grid; grid-template-columns: 8px minmax(0, 1fr) auto auto 46px; gap: 0 7px; align-items: center; padding: 4px 0 3px; border-bottom: 1px solid var(--grid); white-space: nowrap; }
+.cand { display: grid; grid-template-columns: 24px minmax(0, 1fr) auto auto 46px; gap: 0 7px; align-items: center; padding: 4px 0 3px; border-bottom: 1px solid var(--grid); white-space: nowrap; }
 .cand:last-child { border-bottom: 0; }
-.cand .sw { width: 8px; height: 8px; border-radius: 2px; background: transparent; }
+.av { width: 22px; height: 22px; border-radius: 50%; overflow: hidden; background: var(--surface-2); display: inline-grid; place-items: center; flex: none; margin-left: 2px; }
+.av img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.av-i { font-size: 9px; font-weight: 700; color: var(--muted); letter-spacing: .02em; }
+.dense .av { width: 20px; height: 20px; }
 .cand .nm { overflow: hidden; text-overflow: ellipsis; }
 .cand .votes { color: var(--ink-2); text-align: right; font-size: 13px; }
 .cand .pct { text-align: right; font-weight: 600; }
@@ -234,16 +243,18 @@ td .sub2 { color: var(--muted); font-size: 11px; margin-top: 1px; font-variant-n
 .board-ward .race-head h3 { color: var(--ink); text-transform: none; letter-spacing: 0; font-size: 13px; }
 
 /* Race calls */
-:root { --good-fill: #0b7a0b; }
-.call { font: 650 11px/1 system-ui, -apple-system, "Segoe UI", sans-serif; letter-spacing: .01em; padding: 4px 8px; border-radius: 999px; border: 1px solid var(--axis); background: var(--surface); color: var(--ink-2); cursor: pointer; white-space: nowrap; text-transform: none; vertical-align: 1px; }
+:root { --good-fill: #0b7a0b; --proj: #184f95; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --proj: #2f6fc4; } }
+:root[data-theme="dark"] { --proj: #2f6fc4; }
+.call { display: inline-flex; align-items: center; gap: 0; height: 22px; font: 650 11px/1 system-ui, -apple-system, "Segoe UI", sans-serif; letter-spacing: .01em; padding: 0 8px; border-radius: 999px; border: 1px solid var(--axis); background: var(--surface); color: var(--ink-2); cursor: pointer; white-space: nowrap; text-transform: none; vertical-align: middle; flex: none; }
 .call:hover { filter: brightness(1.08); }
 .call-awaiting { color: var(--muted); border-style: dashed; }
 .call-early, .call-close { color: var(--ink-2); }
-.call .i { display: inline-grid; place-items: center; width: 13px; height: 13px; margin-left: 6px; margin-right: -2px; border-radius: 50%; border: 1px solid currentColor; font: italic 700 9px/1 Georgia, serif; opacity: .75; vertical-align: -1px; }
+.call .i { display: inline-flex; align-items: center; justify-content: center; width: 13px; height: 13px; margin: 0 -3px 0 6px; border-radius: 50%; border: 1px solid currentColor; font: italic 700 9px/1 Georgia, serif; opacity: .8; box-sizing: border-box; }
 #callTip > .call .i, dl.calls .call .i { display: none; }
 .call-tied { color: var(--critical); border-color: currentColor; }
-.call-projected { background: var(--ink); color: var(--surface); border-color: var(--ink); }
-.call-decided, .call-official { background: var(--good-fill); color: #fff; border-color: var(--good-fill); }
+.call-projected { background: var(--proj); color: #fff; border-color: var(--proj); }
+.call-decided, .call-official, .call-acclaimed { background: var(--good-fill); color: #fff; border-color: var(--good-fill); }
 .call-official { box-shadow: 0 0 0 3px color-mix(in srgb, var(--good-fill) 28%, transparent); }
 .callrow { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; margin: 6px 0 0; min-width: 0; }
 .callrow .lead-txt { font-size: 12.5px; color: var(--ink-2); line-height: 1.35; }
@@ -254,12 +265,12 @@ td .sub2 { color: var(--muted); font-size: 11px; margin-top: 1px; font-variant-n
 .stat:first-child { min-width: 170px; }
 @media (min-width: 1200px) { header.top { flex-wrap: nowrap; } .stats { flex-wrap: nowrap; } }
 .stat .st { text-transform: none; letter-spacing: 0; }
-.stat .st-projected { color: var(--ink); font-weight: 650; }
+.stat .st-projected { color: var(--proj); font-weight: 650; }
 .stat .st-decided, .stat .st-official { color: var(--good-fill); font-weight: 650; }
-.tag.tag-projected { color: var(--ink); }
-.tag.tag-decided, .tag.tag-official { color: var(--good-fill); }
+.tag.tag-projected { color: var(--proj); }
+.tag.tag-decided, .tag.tag-official, .tag.tag-acclaimed { color: var(--good-fill); }
 .ico { display: inline-block; width: 14px; text-align: center; font-size: 11px; margin-right: 2px; }
-.ico-projected { color: var(--ink); }
+.ico-projected { color: var(--proj); }
 .ico-decided, .ico-official { color: var(--good-fill); font-weight: 700; }
 .table-key { color: var(--muted); font-size: 12px; margin: 10px 0 0; }
 .linkish { border: 0; background: none; padding: 0; color: var(--ink); text-decoration: underline; cursor: pointer; font-size: 12px; }

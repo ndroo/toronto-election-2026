@@ -1,0 +1,630 @@
+{
+"mayor|Bahira Abdulsalam": {
+"f": "bahira-abdulsalam-a068.jpg",
+"from": "https://bahira.ca/"
+},
+"mayor|Chris Alexander": {
+"f": "chris-alexander-a068.jpg",
+"from": "https://chrisalexander.ca/"
+},
+"mayor|Jamie Atkinson": {
+"f": "jamie-atkinson-a068.jpg",
+"from": "https://jamieatkinson.ca/"
+},
+"mayor|Darrell Brown": {
+"f": "darrell-brown-a068.jpg",
+"from": "https://electdarrellbrown.ca/"
+},
+"mayor|Olivia Chow": {
+"f": "olivia-chow-a068.jpg",
+"from": "https://www.oliviachow.ca"
+},
+"mayor|Faizan Haider": {
+"f": "faizan-haider-a068.jpg",
+"from": "https://www.faizanhaider.ca"
+},
+"mayor|Georgios Kalkounis": {
+"f": "georgios-kalkounis-a068.jpg",
+"from": "https://georgioskalkounisformayor.com/"
+},
+"mayor|Michael Lamoureux": {
+"f": "michael-lamoureux-a068.jpg",
+"from": "https://www.michaellamoureux.ca/"
+},
+"mayor|Sarah McVie": {
+"f": "sarah-mcvie-a068.jpg",
+"from": "https://www.mayormcvie.ca"
+},
+"mayor|Odessa Paloma Parker": {
+"f": "odessa-paloma-parker-a068.jpg",
+"from": "https://www.odessaformayor.ca/"
+},
+"mayor|Amy Rosen": {
+"f": "amy-rosen-a068.jpg",
+"from": "https://www.RosenForMayor.ca"
+},
+"mayor|Lyall Sanders": {
+"f": "lyall-sanders-a068.jpg",
+"from": "https://www.Sanders4Mayor.ca"
+},
+"mayor|Naomi Sayers": {
+"f": "naomi-sayers-a068.jpg",
+"from": "https://naomisayers.com/"
+},
+"mayor|Robert Shusterman": {
+"f": "robert-shusterman-a068.jpg",
+"from": "https://www.robertshusterman.com"
+},
+"mayor|Sandeep Srivastava": {
+"f": "sandeep-srivastava-a068.jpg",
+"from": "http://www.sandeepsrivastavafortorontomayor.wordpress.com/"
+},
+"mayor|Weizhen Tang": {
+"f": "weizhen-tang-a068.jpg",
+"from": "https://weizhentang.today/"
+},
+"mayor|Joshua Thompson": {
+"f": "joshua-thompson-a068.jpg",
+"from": "https://joshthompsonformayor.ca/"
+},
+"mayor|Jeffery Tunney": {
+"f": "jeffery-tunney-a068.jpg",
+"from": "https://www.jefferytunney4mayor.com"
+},
+"council-1|Ala'a Adib": {
+"f": "ala-a-adib-1ad8.jpg",
+"from": "https://www.alaaadib.ca"
+},
+"council-1|Chloe Brown": {
+"f": "chloe-brown-1ad8.jpg",
+"from": "https://www.cb4ward1.ca/"
+},
+"council-1|Vincent Crisanti": {
+"f": "vincent-crisanti-1ad8.jpg",
+"from": "https://www.votecrisanti.com/"
+},
+"council-1|Nathen Masri": {
+"f": "nathen-masri-1ad8.jpg",
+"from": "https://www.nathenmazri.ca/"
+},
+"council-1|Kristian Santos": {
+"f": "kristian-santos-1ad8.jpg",
+"from": "https://kristiansantos.ca"
+},
+"council-2|Katie Andrachuk": {
+"f": "katie-andrachuk-99b3.jpg",
+"from": "https://www.votekatie.ca/"
+},
+"council-2|Stephen Holyday": {
+"f": "stephen-holyday-99b3.jpg",
+"from": "https://www.holyday.ca/"
+},
+"council-3|Mihaela Andrei": {
+"f": "mihaela-andrei-b500.jpg",
+"from": "https://mihaelaandrei.ca/"
+},
+"council-3|Anthony Internicola": {
+"f": "anthony-internicola-b500.jpg",
+"from": "https://www.toronto4life.ca/"
+},
+"council-3|Amber Morley": {
+"f": "amber-morley-b500.jpg",
+"from": "https://voteambermorley.ca/"
+},
+"council-4|Nadia Guerrera": {
+"f": "nadia-guerrera-e0bf.jpg",
+"from": "https://www.nadiaguerrera.ca"
+},
+"council-4|Diana Chan McNally": {
+"f": "diana-chan-mcnally-e0bf.jpg",
+"from": "https://www.dianachanmcnally.ca"
+},
+"council-4|Bridget Ogundipe": {
+"f": "bridget-ogundipe-e0bf.jpg",
+"from": "https://www.bridgetogundipe.ca"
+},
+"council-4|Adam Pham": {
+"f": "adam-pham-e0bf.jpg",
+"from": "https://adampham.ca/"
+},
+"council-4|Holly Weber": {
+"f": "holly-weber-e0bf.jpg",
+"from": "https://www.hollyweber.ca"
+},
+"council-4|Steve Yuen": {
+"f": "steve-yuen-e0bf.jpg",
+"from": "https://www.steveyuen.ca/"
+},
+"council-5|Ahmed Mawel": {
+"f": "ahmed-mawel-1ad6.jpg",
+"from": "https://ahmedmawel.ca/"
+},
+"council-5|Frances Nunziata": {
+"f": "frances-nunziata-1ad6.jpg",
+"from": "https://votenunziata2026.ca/"
+},
+"council-5|Chiara Padovani": {
+"f": "chiara-padovani-1ad6.jpg",
+"from": "https://www.chiarapadovani.ca/"
+},
+"council-5|Sileen Phillips": {
+"f": "sileen-phillips-1ad6.jpg",
+"from": "https://www.sileenphillips-ysw.ca"
+},
+"council-6|Conroy Irving": {
+"f": "conroy-irving-307a.jpg",
+"from": "https://www.voteconroyirving.ca"
+},
+"council-6|James Pasternak": {
+"f": "james-pasternak-307a.jpg",
+"from": "https://www.jamespasternak.com/"
+},
+"council-7|Lorna Antwi": {
+"f": "lorna-antwi-b47d.jpg",
+"from": "https://www.lornaantwi.com/"
+},
+"council-7|Amanda Coombs": {
+"f": "amanda-coombs-b47d.jpg",
+"from": "https://www.voteamandacoombs.com"
+},
+"council-7|Anthony Perruzza": {
+"f": "anthony-perruzza-b47d.jpg",
+"from": "https://www.voteanthonyperruzza.com"
+},
+"council-8|Liz Grade": {
+"f": "liz-grade-5826.jpg",
+"from": "https://votelizgrade.ca"
+},
+"council-8|Domenico Maiolo": {
+"f": "domenico-maiolo-5826.jpg",
+"from": "https://domenicomaiolo.com/"
+},
+"council-10|Ian Cunningham": {
+"f": "ian-cunningham-5d53.jpg",
+"from": "https://www.iancunninghamto.ca"
+},
+"council-10|Xue Ding": {
+"f": "xue-ding-5d53.jpg",
+"from": "https://www.votexueding.ca"
+},
+"council-10|Bashar Kassir": {
+"f": "bashar-kassir-5d53.jpg",
+"from": "https://www.basharkassir.ca"
+},
+"council-10|Ausma Malik": {
+"f": "ausma-malik-5d53.jpg",
+"from": "https://www.ausma.ca/"
+},
+"council-10|Husain Neemuchwala": {
+"f": "husain-neemuchwala-5d53.jpg",
+"from": "https://www.husainneem.ca"
+},
+"council-10|Aanchal Vashistha": {
+"f": "aanchal-vashistha-5d53.jpg",
+"from": "https://www.voteforaanchal.ca"
+},
+"council-11|Keenan Courtis": {
+"f": "keenan-courtis-59f2.jpg",
+"from": "https://keenancourtis.ca/"
+},
+"council-11|Terri Hawkes": {
+"f": "terri-hawkes-59f2.jpg",
+"from": "https://www.voteterrihawkes.ca"
+},
+"council-11|Mike Layton": {
+"f": "mike-layton-59f2.jpg",
+"from": "https://www.mikelayton.ca/"
+},
+"council-11|Alice Li": {
+"f": "alice-li-59f2.jpg",
+"from": "https://www.aliceli.ca/"
+},
+"council-11|Gian Pileri": {
+"f": "gian-pileri-59f2.jpg",
+"from": "https://www.gianpileri.ca/"
+},
+"council-11|Diana Yoon": {
+"f": "diana-yoon-59f2.jpg",
+"from": "https://www.VoteYoon.ca"
+},
+"council-12|David Cottrell": {
+"f": "david-cottrell-0da9.jpg",
+"from": "https://www.votecottrell.ca"
+},
+"council-12|Ahmed Kamal": {
+"f": "ahmed-kamal-0da9.jpg",
+"from": "https://www.voteforahmed.ca/"
+},
+"council-12|Josh Matlow": {
+"f": "josh-matlow-0da9.jpg",
+"from": "https://www.reelectmatlow.com/"
+},
+"council-13|Tom Cai": {
+"f": "tom-cai-f434.jpg",
+"from": "https://www.tomforward13.com"
+},
+"council-13|Victoria Davis": {
+"f": "victoria-davis-f434.jpg",
+"from": "https://www.victoriaforcentre.ca"
+},
+"council-13|Walied Khogali Ali": {
+"f": "walied-khogali-ali-f434.jpg",
+"from": "https://www.votewalied.ca"
+},
+"council-13|Norman MacLeod": {
+"f": "norman-macleod-f434.jpg",
+"from": "https://fask.city/candidate/norman-macleod-ward-13#priorities"
+},
+"council-13|Chris Moise": {
+"f": "chris-moise-f434.jpg",
+"from": "https://www.chrismoise.vote"
+},
+"council-13|Curran Stikuts": {
+"f": "curran-stikuts-f434.jpg",
+"from": "https://www.votecurran.ca"
+},
+"council-13|Daniel Tate": {
+"f": "daniel-tate-f434.jpg",
+"from": "https://www.votetate.ca"
+},
+"council-14|Maqsood Ahmad": {
+"f": "maqsood-ahmad-6ea9.jpg",
+"from": "https://www.electmaqsood.com/"
+},
+"council-14|Sara Ehrhardt": {
+"f": "sara-ehrhardt-6ea9.jpg",
+"from": "https://www.saraehrhardt.ca/"
+},
+"council-14|Mary Fragedakis": {
+"f": "mary-fragedakis-6ea9.jpg",
+"from": "https://maryfragedakis.ca/"
+},
+"council-14|John Kladitis": {
+"f": "john-kladitis-6ea9.jpg",
+"from": "https://torontodanforthconnected.ca/"
+},
+"council-14|Dianne Saxe": {
+"f": "dianne-saxe-6ea9.jpg",
+"from": "https://www.votesaxe.ca/"
+},
+"council-14|Christiane Tetreault": {
+"f": "christiane-tetreault-6ea9.jpg",
+"from": "https://christianetetreault.ca/"
+},
+"council-14|Maria Voutsinas": {
+"f": "maria-voutsinas-6ea9.jpg",
+"from": "https://votemaria.ca/"
+},
+"council-15|Rachel Chernos Lin": {
+"f": "rachel-chernos-lin-9e46.jpg",
+"from": "https://www.voterachel.ca"
+},
+"council-15|Denis Tsang": {
+"f": "denis-tsang-9e46.jpg",
+"from": "https://votedenistsang.ca/"
+},
+"council-16|Jon Burnside": {
+"f": "jon-burnside-ead1.jpg",
+"from": "https://jonburnside.ca/"
+},
+"council-16|Sinan Erdemir": {
+"f": "sinan-erdemir-ead1.jpg",
+"from": "https://www.votesinan.com"
+},
+"council-16|Didi Moffat": {
+"f": "didi-moffat-ead1.jpg",
+"from": "https://iamdidimoffat.ca/"
+},
+"council-16|Stacey Moffatt": {
+"f": "stacey-moffatt-ead1.jpg",
+"from": "https://www.electstacey.ca/"
+},
+"council-17|Jeffery Adamson": {
+"f": "jeffery-adamson-8e4c.jpg",
+"from": "https://www.votejeffward17.ca/"
+},
+"council-17|Shelley Carroll": {
+"f": "shelley-carroll-8e4c.jpg",
+"from": "https://www.voteshelleycarroll.ca/"
+},
+"council-17|Jethro Adir Kavod": {
+"f": "jethro-adir-kavod-8e4c.jpg",
+"from": "https://jethroforward.ca/"
+},
+"council-17|Hassan Mubarak Noor Mohamed": {
+"f": "hassan-mubarak-noor-mohamed-8e4c.jpg",
+"from": "https://www.hassanmubarak.ca/"
+},
+"council-17|Roy Samathanam": {
+"f": "roy-samathanam-8e4c.jpg",
+"from": "https://www.royward17.com/"
+},
+"council-18|Lily Cheng": {
+"f": "lily-cheng-4060.jpg",
+"from": "https://www.votelilycheng.ca/"
+},
+"council-18|David Magazzinich": {
+"f": "david-magazzinich-4060.jpg",
+"from": "https://www.davidfortoronto.ca/"
+},
+"council-18|Hamid Shakeri": {
+"f": "hamid-shakeri-4060.jpg",
+"from": "https://hamidshakeri.ca/"
+},
+"council-18|Ardeshir Zarezade": {
+"f": "ardeshir-zarezade-4060.jpg",
+"from": "https://www.voteardeshir.ca"
+},
+"council-19|Syeda Jaana Ali": {
+"f": "syeda-jaana-ali-b9b9.jpg",
+"from": "https://jaanasyedaali.ca/"
+},
+"council-19|James Dann": {
+"f": "james-dann-b9b9.jpg",
+"from": "https://jamesdann.ca/"
+},
+"council-19|Nate Erskine-Smith": {
+"f": "nate-erskine-smith-b9b9.jpg",
+"from": "https://www.nateerskinesmith.ca/"
+},
+"council-19|Fatima Ibrahimi": {
+"f": "fatima-ibrahimi-b9b9.jpg",
+"from": "https://www.fatimaward19.ca/"
+},
+"council-19|Kevin Morrison": {
+"f": "kevin-morrison-b9b9.jpg",
+"from": "https://electkevinmorrison.com/"
+},
+"council-19|Adam Smith": {
+"f": "adam-smith-b9b9.jpg",
+"from": "https://www.adamsmithward19.ca"
+},
+"council-19|Jeff Wahl": {
+"f": "jeff-wahl-b9b9.jpg",
+"from": "https://www.jeffwahlbey.com/"
+},
+"council-19|Devin Wilkins": {
+"f": "devin-wilkins-b9b9.jpg",
+"from": "https://www.votedevinwilkins.ca"
+},
+"council-20|Parthi Kandavel": {
+"f": "parthi-kandavel-fc04.jpg",
+"from": "https://parthikandavel.ca/"
+},
+"council-20|Sharmina Nasrin": {
+"f": "sharmina-nasrin-fc04.jpg",
+"from": "https://www.sharminanasrin.ca/"
+},
+"council-20|Mohammad Ali Reza": {
+"f": "mohammad-ali-reza-fc04.jpg",
+"from": "https://vote4reza.ca/"
+},
+"council-20|Kevin Rupasinghe": {
+"f": "kevin-rupasinghe-fc04.jpg",
+"from": "https://www.kevinrupasinghe.ca/"
+},
+"council-21|Bahareh Barahmand": {
+"f": "bahareh-barahmand-5562.jpg",
+"from": "https://bahareh-toronto.ca/"
+},
+"council-21|Uthish Ganesh": {
+"f": "uthish-ganesh-5562.jpg",
+"from": "https://ganeshforward21.ca/"
+},
+"council-21|Madura Shanmugaratnam": {
+"f": "madura-shanmugaratnam-5562.jpg",
+"from": "https://madura4ward21.ca"
+},
+"council-21|Michael Thompson": {
+"f": "michael-thompson-5562.jpg",
+"from": "https://www.reelectmichaelthompson.ca/"
+},
+"council-21|Krissan Veerasingam": {
+"f": "krissan-veerasingam-5562.jpg",
+"from": "https://www.krissan4scarb.ca"
+},
+"council-22|Madhuri Azad": {
+"f": "madhuri-azad-9c1c.jpg",
+"from": "https://www.madhuriazad.ca/"
+},
+"council-22|Jackson Ho": {
+"f": "jackson-ho-9c1c.jpg",
+"from": "https://voteforjackson.ca/"
+},
+"council-22|Serge Khatchadourian": {
+"f": "serge-khatchadourian-9c1c.jpg",
+"from": "https://www.4ward22.ca/"
+},
+"council-22|Donny Morgan": {
+"f": "donny-morgan-9c1c.jpg",
+"from": "https://www.donnymorgan.ca"
+},
+"council-23|Kevin Li": {
+"f": "kevin-li-a7a8.jpg",
+"from": "https://www.votekevinli.com"
+},
+"council-23|Jamaal Myers": {
+"f": "jamaal-myers-a7a8.jpg",
+"from": "https://www.ElectJamaalMyers.com"
+},
+"council-24|Paul Ainslie": {
+"f": "paul-ainslie-e2e5.jpg",
+"from": "https://www.voteainslie.ca/"
+},
+"council-25|Shawn Allen": {
+"f": "shawn-allen-2724.jpg",
+"from": "https://electshawnallen.ca/"
+},
+"council-25|Jannette Lumley": {
+"f": "jannette-lumley-2724.jpg",
+"from": "https://jannettelumley.ca/"
+},
+"council-25|Zakir Patel": {
+"f": "zakir-patel-2724.jpg",
+"from": "https://votezakir.ca/"
+},
+"o3-1|Antonius Clarke": {
+"f": "antonius-clarke-8734.jpg",
+"from": "https://antoniusclarke.com/"
+},
+"o3-1|Matias de Dovitiis": {
+"f": "matias-de-dovitiis-8734.jpg",
+"from": "https://www.matiasdedovitiis.ca"
+},
+"o3-1|Lakhan Kang": {
+"f": "lakhan-kang-8734.jpg",
+"from": "https://www.lakhankang.com/"
+},
+"o3-2|Timothy Ellis": {
+"f": "timothy-ellis-562e.jpg",
+"from": "https://www.votetim.ca/"
+},
+"o3-2|Matthew Zaffino": {
+"f": "matthew-zaffino-562e.jpg",
+"from": "https://www.matthewzaffino.ca"
+},
+"o3-3|Alexis Dawson": {
+"f": "alexis-dawson-64d7.jpg",
+"from": "https://www.alexisdawson.ca/"
+},
+"o3-4|Brandon Choi": {
+"f": "brandon-choi-b7a0.jpg",
+"from": "https://www.brandonchoi.ca/"
+},
+"o3-4|Weidong Pei": {
+"f": "weidong-pei-b7a0.jpg",
+"from": "https://www.weidongpei.ca"
+},
+"o3-5|Elina Feyginberg": {
+"f": "elina-feyginberg-6ca4.jpg",
+"from": "https://www.elina4trustee.ca"
+},
+"o3-5|Andrene Gregory": {
+"f": "andrene-gregory-6ca4.jpg",
+"from": "https://www.andrenegregory.ca/"
+},
+"o3-5|Maureen Larkin": {
+"f": "maureen-larkin-6ca4.jpg",
+"from": "https://www.maureenlarkinto.ca"
+},
+"o3-5|Andrew Massey": {
+"f": "andrew-massey-6ca4.jpg",
+"from": "https://www.votemassey.ca/"
+},
+"o3-5|Gus Stefanis": {
+"f": "gus-stefanis-6ca4.jpg",
+"from": "https://sites.google.com/view/gus-stefanis"
+},
+"o3-6|Stacey Cline": {
+"f": "stacey-cline-ffdc.jpg",
+"from": "https://staceycline.ca"
+},
+"o3-6|Saherla Osman": {
+"f": "saherla-osman-ffdc.jpg",
+"from": "https://www.saherlaosman.ca/"
+},
+"o3-6|Sarah Smithies": {
+"f": "sarah-smithies-ffdc.jpg",
+"from": "https://sarahward6.ca/"
+},
+"o3-7|Adam Golding": {
+"f": "adam-golding-0a20.jpg",
+"from": "https://www.adamgolding.ca"
+},
+"o3-7|Tasha Kheiriddin": {
+"f": "tasha-kheiriddin-0a20.jpg",
+"from": "https://www.votetasha.ca/"
+},
+"o3-7|Shaffni Nalir": {
+"f": "shaffni-nalir-0a20.jpg",
+"from": "https://votenalir.ca/"
+},
+"o3-9|Christopher Mammoliti": {
+"f": "christopher-mammoliti-3e54.jpg",
+"from": "https://mammolitifortrustee.ca/"
+},
+"o3-9|Bill Wu": {
+"f": "bill-wu-3e54.jpg",
+"from": "https://yongwu.ca/"
+},
+"o3-10|Karen Emerson": {
+"f": "karen-emerson-df6b.jpg",
+"from": "https://www.voteemerson.ca/"
+},
+"o3-10|Ahnaaf Hassan": {
+"f": "ahnaaf-hassan-df6b.jpg",
+"from": "https://www.ahnaafhassan.ca"
+},
+"o3-10|Jocelyne Poirier": {
+"f": "jocelyne-poirier-df6b.jpg",
+"from": "http://jocelynepoirier.ca/"
+},
+"o3-11|Dameon Halstead": {
+"f": "dameon-halstead-1115.jpg",
+"from": "https://dameonhalstead.ca/"
+},
+"o3-11|Abdul Azeem Mohammed": {
+"f": "abdul-azeem-mohammed-1115.jpg",
+"from": "https://www.voteazeem.ca/"
+},
+"o3-11|Ravicha Ravinthiran": {
+"f": "ravicha-ravinthiran-1115.jpg",
+"from": "https://ravicharavi.ca/"
+},
+"o3-12|Vimuththan Nantheeswarar": {
+"f": "vimuththan-nantheeswarar-28a2.jpg",
+"from": "https://www.knowyourvote.to/candidates/toronto-district-school-board-ward-12-vimuththan-nantheeswarar"
+},
+"o3-12|Ketan Purohit": {
+"f": "ketan-purohit-28a2.jpg",
+"from": "https://chat.whatsapp.com/CSkNb7X8nndEqT035K8zQP"
+},
+"o4-1|Jennifer Di Francesco": {
+"f": "jennifer-di-francesco-000d.jpg",
+"from": "https://jennifer4ward1.com/"
+},
+"o4-3|Ida Li Preti": {
+"f": "ida-li-preti-a185.jpg",
+"from": "https://idalipreti.com/"
+},
+"o4-7|Marissa Largo": {
+"f": "marissa-largo-10c8.jpg",
+"from": "https://trusteelargo.ca/"
+},
+"o4-8|Mary Cury Paul": {
+"f": "mary-cury-paul-f614.jpg",
+"from": "https://www.maryfortrustee.ca"
+},
+"o4-10|Rosanna Araujo": {
+"f": "rosanna-araujo-554e.jpg",
+"from": "https://www.rosannaaraujo.com"
+},
+"o4-10|Teresa Colonna": {
+"f": "teresa-colonna-554e.jpg",
+"from": "https://www.teresacolonna.ca/"
+},
+"o5-3|Jean-François L'Heureux": {
+"f": "jean-francois-l-heureux-130d.jpg",
+"from": "https://www.jflheureux.ca"
+},
+"o5-4|Geneviève Oger": {
+"f": "genevieve-oger-c73d.jpg",
+"from": "https://www.csv.genevieveoger.com"
+},
+"o6-3|Josiane Aboungono": {
+"f": "josiane-aboungono-6a44.jpg",
+"from": "https://josianeaboungono.com/"
+},
+"o6-3|Yelena Nichilo": {
+"f": "yelena-nichilo-6a44.jpg",
+"from": "https://www.voteyelenanichilo.ca/"
+},
+"o6-3|Angela Ogang": {
+"f": "angela-ogang-6a44.jpg",
+"from": "https://angelaogang.ca/"
+},
+"o6-4|Rhea Dechaine": {
+"f": "rhea-dechaine-a772.jpg",
+"from": "https://rheadechaine.com/"
+}
+}

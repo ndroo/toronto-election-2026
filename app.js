@@ -133,6 +133,10 @@
           .sort((a, b) => int(a.num) - int(b.num)),
       });
     }
+    // Photo lookup keys match photos.json: mayor | council-N | o<board>-N
+    m.mayor.pkey = 'mayor';
+    for (const w of Object.values(m.wards)) { if (w.mayor) w.mayor.pkey = 'mayor'; if (w.council) w.council.pkey = `council-${w.num}`; }
+    for (const b of m.boards) for (const w of b.wards) w.race.pkey = `o${b.id}-${w.num}`;
     prevVotes = nextVotes;
     // Calls. City-wide mayor estimates the votes still to come ward by ward.
     const perPoll = m.mayor.pollsReceived ? m.mayor.votes / m.mayor.pollsReceived : 0;
@@ -152,7 +156,7 @@
     if (!r || !r.cands.length) return null;
     const [a, b] = r.cands;
     if (OFFICIAL.certified && r.leader && !r.tied) return { status: 'official', reason: `Certified by the City Clerk on ${OFFICIAL.certified}` };
-    if (!b) return { status: 'decided', reason: 'Only candidate in this race' };
+    if (!b) return { status: 'acclaimed', reason: 'Only candidate in this race, so elected by acclamation when nominations closed' };
     if (!r.leader || !r.pollsReceived) return { status: 'awaiting', reason: 'No polls reported yet' };
     if (r.tied) return { status: 'tied', reason: `Tied at ${fmt(a.votes)} votes each` };
     if (r.complete) return { status: 'decided', reason: `All ${fmt(r.polls)} polls reported - unofficial until certified` };
@@ -168,8 +172,8 @@
     if (rep < CALL.minReporting) return { status: 'early', need, reason: `Only ${pct(rep * 100, 0)} of polls are in. Calls start at ${CALL.minReporting * 100}%.` };
     return { status: need >= CALL.needShare || need - hasNow >= CALL.swing ? 'projected' : 'close', need, reason: why };
   }
-  const CALL_LABEL = { official: '&#10003; Official winner', decided: '&#10003; Winner &middot; unofficial', projected: '&#9670; Projected winner', close: 'Too close to call', early: 'Too early to call', tied: 'Tied', awaiting: 'No results yet' };
-  const CALLED = new Set(['projected', 'decided', 'official']);
+  const CALL_LABEL = { acclaimed: '&#10003; Acclaimed', official: '&#10003; Official winner', decided: '&#10003; Winner &middot; unofficial', projected: '&#9670; Projected winner', close: 'Too close to call', early: 'Too early to call', tied: 'Tied', awaiting: 'No results yet' };
+  const CALLED = new Set(['projected', 'decided', 'official', 'acclaimed']);
   // One definition per label, shared by the hover card and the Methodology tab.
   const CALL_DEF = {
     awaiting: 'No polls in this race have reported yet.',
@@ -177,6 +181,7 @@
     close: `Enough polls are in to consider a call, but the runner-up could still realistically catch up. The candidate listed first is ahead for now.`,
     tied: 'The top two candidates have exactly the same number of votes.',
     projected: `This page's estimate, not an official result: at least ${CALL.minReporting * 100}% of polls are in, and to catch up the runner-up would need ${CALL.needShare * 100}% or more of the remaining votes between the top two, or a share ${CALL.swing * 100} or more points higher than they have managed so far.`,
+    acclaimed: 'Only one candidate was nominated, so the City Clerk declared them elected by acclamation before election day. No votes are cast in this race.',
     decided: 'The result can no longer change: all polls are in, the lead is bigger than every elector not yet counted, or only one candidate is running. Still unofficial until the City Clerk certifies.',
     official: 'The City Clerk has certified the results. This is set by hand once certified results are posted; the feed never says it.',
   };
@@ -186,7 +191,8 @@
     if (!r) return '';
     const [a, b] = r.cands;
     let txt;
-    if (!r.leader) txt = `${r.cands.length} candidate${r.cands.length === 1 ? '' : 's'} · no votes counted yet`;
+    if (r.cands.length === 1) txt = `<b>${esc(a.name)}</b> is the only candidate`;
+    else if (!r.leader) txt = `${r.cands.length} candidate${r.cands.length === 1 ? '' : 's'} · no votes counted yet`;
     else if (r.tied) txt = `<b>${esc(a.name)}</b> and <b>${esc(b.name)}</b> are tied at ${fmt(a.votes)}`;
     else if (!b) txt = `<b>${esc(a.name)}</b> is the only candidate`;
     else txt = `<b>${esc(a.name)}</b> leads ${esc(b.name)} by <b>${fmt(a.votes - b.votes)}</b> votes (${(a.pct - b.pct).toFixed(1)} pts)`;
@@ -198,7 +204,7 @@
     const ex = (st) => `<span class="call call-${st}">${CALL_LABEL[st]}</span>`;
     const sections = [
       ['m-disclaimer', 'Disclaimer'], ['m-calls', 'Race calls'], ['m-data', 'Where the numbers come from'], ['m-calc', 'How each number is worked out'],
-      ['m-map', 'Map colours'], ['m-limits', 'Limits'],
+      ['m-map', 'Map colours'], ['m-photos', 'Candidate photos'], ['m-limits', 'Limits'],
     ];
     $('#method').innerHTML = `
       <h2>Methodology</h2>
@@ -215,7 +221,7 @@
 
       <section id="m-calls"><h3>Race calls</h3>
       <p><b>The City's feed only reports unofficial vote counts. It never says a race is decided.</b> Every label below is this page's own estimate, recalculated each time the feed updates. News outlets may call races sooner or later using other information.</p>
-      <dl class="calls">${['awaiting', 'early', 'close', 'tied', 'projected', 'decided', 'official'].map((st) => `<dt>${ex(st)}</dt><dd>${CALL_DEF[st]}</dd>`).join('')}</dl>
+      <dl class="calls">${['awaiting', 'early', 'close', 'tied', 'projected', 'decided', 'official', 'acclaimed'].map((st) => `<dt>${ex(st)}</dt><dd>${CALL_DEF[st]}</dd>`).join('')}</dl>
       <p><b>The projection, step by step</b></p>
       <ol>
         <li>Wait until at least <b>${CALL.minReporting * 100}%</b> of the race's polls have reported.</li>
@@ -249,6 +255,11 @@
       <p><b>Mayor leader:</b> the top three mayoral candidates city-wide each get a colour, and keep it even if their ranks change. A ward led by anyone else, or tied, is grey. Darker means a wider lead in that ward (full strength at 30 points or more).</p>
       <p><b>Council margin:</b> darker blue means a wider lead for the council leader (full strength at 40 points). <b>Reporting</b> and <b>Turnout:</b> darker means higher (turnout full strength at 60%).</p>
       <p>Ward boundaries: <a href="https://open.toronto.ca/dataset/city-wards/">Toronto Open Data</a>, 25-ward model, simplified for the web.</p>
+      </section>
+
+      <section id="m-photos"><h3>Candidate photos</h3>
+      <p>Photos were taken from each candidate's own campaign website or social page, as listed on the <a href="https://www.toronto.ca/city-government/elections/candidate-list/">City's candidate list</a>, and cropped automatically around the face. Each crop was then checked by hand, and images that weren't clearly a headshot of the candidate were dropped. Candidates without a usable photo are shown with their initials. If a photo is wrong, contact <a href="https://andrewmcgrath.info">Andrew McGrath</a>.</p>
+      <p>On the map, the Mayor and Council views show the top three candidates at each ward's centre. The leader is largest and in front. Others shrink with their vote share relative to the leader and are dropped once they have less than ${FACE_MIN_RATIO * 100}% of the leader's votes.</p>
       </section>
 
       <section id="m-limits"><h3>Limits</h3>
@@ -403,6 +414,8 @@
   const svg = $('#map');
   const NS = 'http://www.w3.org/2000/svg';
   const paths = {};
+  const wardSize = {};
+  let faceLayer;
   let hl, pin;
   function buildMap() {
     svg.setAttribute('viewBox', `0 0 ${geo.w} ${geo.h}`);
@@ -421,12 +434,16 @@
       const t = document.createElementNS(NS, 'text');
       t.setAttribute('x', w.lx); t.setAttribute('y', w.ly);
       t.setAttribute('class', 'lbl');
+      t.dataset.n = num;
       t.textContent = num;
       gL.appendChild(t);
     }
     pin = document.createElementNS(NS, 'path'); pin.setAttribute('class', 'pin');
     hl = document.createElementNS(NS, 'path'); hl.setAttribute('class', 'hl');
-    svg.append(gW, pin, hl, gL);
+    faceLayer = document.createElementNS(NS, 'g'); faceLayer.setAttribute('class', 'faces');
+    svg.append(gW, pin, hl, faceLayer, gL);
+    // Face size scales with the ward's footprint so small downtown wards don't overflow.
+    for (const [num, p] of Object.entries(paths)) { const b = p.getBBox(); wardSize[num] = Math.sqrt(b.width * b.height); }
 
     svg.addEventListener('pointermove', (e) => {
       const n = e.target.dataset?.w;
@@ -475,7 +492,42 @@
     const label = css('--ink'), halo = css('--surface');
     for (const t of svg.querySelectorAll('.lbl')) { t.style.fill = label; t.style.stroke = halo; }
     pin.setAttribute('d', geo.wards[pinned]?.d || '');
+    renderFaces();
     renderLegend();
+  }
+
+  // Top three faces at each ward's centre for the mayor and council views. The leader is largest and on top;
+  // the others shrink with their share relative to the leader and drop out once they trail badly.
+  const FACE_MIN_RATIO = 0.4;
+  function renderFaces() {
+    const parts = [];
+    let clipId = 0;
+    const show = (mode === 'mayor' || mode === 'council') && model;
+    for (const [num, g] of Object.entries(geo.wards)) {
+      const lbl = svg.querySelector(`.lbl[data-n="${num}"]`);
+      const w = show ? model.wards[num] : null;
+      const r = w && (mode === 'mayor' ? w.mayor : w.council);
+      const top = r?.leader ? r.cands.filter((c) => c.votes > 0).slice(0, 3) : [];
+      if (!top.length) { lbl.setAttribute('y', g.ly); lbl.classList.remove('small'); continue; }
+      const r1 = clamp(wardSize[num] * 0.2, 22, 36);
+      const faces = top.map((c, i) => ({ c, i, rad: i === 0 ? r1 : r1 * 0.78 * Math.sqrt(c.votes / top[0].votes) }))
+        .filter((f) => f.i === 0 || f.c.votes / top[0].votes >= FACE_MIN_RATIO);
+      const pos = [[0, 0], [r1 * 0.95, r1 * 0.2], [-r1 * 0.95, r1 * 0.2]];
+      for (const f of faces.slice().reverse()) { // draw back to front
+        const x = g.lx + pos[f.i][0], y = g.ly + pos[f.i][1];
+        const ring = mode === 'mayor' ? (candColour(f.c.name) || css('--other')) : (f.i === 0 ? css('--ink') : css('--surface'));
+        const ph = photoOf(r.pkey, f.c.name);
+        const id = `fc${clipId++}`;
+        parts.push(`<g class="face${f.i === 0 ? ' lead' : ''}"><title>${esc(f.c.name)} ${pct(f.c.pct)}</title>
+          <circle cx="${x}" cy="${y}" r="${f.rad + 2.5}" fill="${ring}"/>
+          ${ph ? `<clipPath id="${id}"><circle cx="${x}" cy="${y}" r="${f.rad}"/></clipPath>
+            <image href="photos/${ph.f}" x="${x - f.rad}" y="${y - f.rad}" width="${f.rad * 2}" height="${f.rad * 2}" clip-path="url(#${id})" preserveAspectRatio="xMidYMid slice"/>`
+            : `<circle cx="${x}" cy="${y}" r="${f.rad}" class="face-i"/><text x="${x}" y="${y}" class="face-t" style="font-size:${f.rad * 0.58}px">${esc(initials(f.c.name))}</text>`}
+        </g>`);
+      }
+      lbl.setAttribute('y', g.ly + r1 + 11); lbl.classList.add('small');
+    }
+    faceLayer.innerHTML = parts.join('');
   }
 
   // Always two rows (key, then notes) so switching modes never changes the card's height.
@@ -547,6 +599,19 @@
     tip.classList.add('on');
   }
 
+  // ---------- photos ----------
+  // photos.json maps "<race key>|<name>" to a face crop from the candidate's own site.
+  let photos = {};
+  const normName = (n) => n.replace(/\s+/g, ' ').trim();
+  const photoOf = (pkey, name) => photos[`${pkey}|${normName(name)}`];
+  const initials = (name) => { const p = normName(name).split(' '); return ((p[0]?.[0] || '') + (p.length > 1 ? p[p.length - 1][0] : '')).toUpperCase(); };
+  function avatar(pkey, name, ring) {
+    const ph = photoOf(pkey, name);
+    const st = ring ? ` style="box-shadow:0 0 0 2px ${ring}"` : '';
+    return ph ? `<span class="av"${st}><img src="photos/${ph.f}" alt="" loading="lazy" decoding="async"></span>`
+      : `<span class="av av-i"${st}>${esc(initials(name))}</span>`;
+  }
+
   // ---------- rendering: lists ----------
   function candList(r, { colour = false, showCall = true } = {}) {
     if (!r || !r.cands.length) return '<li class="empty">No candidates in feed</li>';
@@ -555,9 +620,9 @@
       const lead = r.leader && i === 0 && !r.tied;
       const col = colour ? candColour(c.name) : null;
       const st = r.call?.status;
-      const tag = lead && showCall && CALLED.has(st) ? `<span class="tag tag-${st}">${{ projected: 'Projected', decided: 'Winner', official: 'Official' }[st]}</span>` : '';
+      const tag = lead && showCall && CALLED.has(st) ? `<span class="tag tag-${st}">${{ projected: 'Projected', decided: 'Winner', official: 'Official', acclaimed: 'Acclaimed' }[st]}</span>` : '';
       return `<li class="cand${lead ? ' lead' : ''}${c.delta && flashNow ? ' flash' : ''}" title="${esc(c.name)}: ${fmt(c.votes)} votes (${pct(c.pct, 2)})${c.delta ? `, +${fmt(c.delta)} since last update` : ''}">
-        <span class="sw" style="background:${col || 'transparent'}"></span>
+        ${avatar(r.pkey, c.name, col)}
         <span class="nm">${esc(c.name)}${tag}</span>
         <span class="delta">${c.delta ? `+${fmt(c.delta)}` : ''}</span>
         <span class="votes">${fmt(c.votes)}</span>
@@ -729,8 +794,12 @@
   // ---------- boot ----------
   if (DEMO) $('#demoBanner').hidden = false;
   matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => model && renderAll());
-  fetch('wards.json').then((r) => r.json()).then((g) => {
+  Promise.all([
+    fetch('wards.json').then((r) => r.json()),
+    fetch('photos.json').then((r) => r.json()).catch(() => ({})),
+  ]).then(([g, ph]) => {
     geo = g;
+    photos = Object.fromEntries(Object.entries(ph).map(([k, v]) => { const [a, b] = k.split('|'); return [`${a}|${normName(b)}`, v]; }));
     buildMap();
     if (!geo.wards[pinned]) pinned = '1';
     setTab(tab);
