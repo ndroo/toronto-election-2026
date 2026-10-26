@@ -898,7 +898,7 @@
       if (lastErr) { st.classList.add('error'); tx.textContent = `Connection problem - showing data from ${gen}`; }
       else if (!DEMO && relayAge > STALE_MS) { st.classList.add('stale'); tx.textContent = `Relay delayed - last checked ${ago(relayAge)}`; }
       else if (r.complete) { st.classList.add('live'); tx.textContent = `All polls in · ${hm(model.generatedAt)}`; }
-      else if (r.pollsReceived > 0) { st.classList.add('live'); tx.textContent = `Live · updated ${hm(model.generatedAt)}`; }
+      else if (r.pollsReceived > 0) { st.classList.add('live'); tx.textContent = `Live · City updated ${model.generatedAt.toLocaleTimeString('en-CA', { timeZone: TZ, hour: 'numeric', minute: '2-digit', second: '2-digit' })}`; }
       else {
         const ms = POLLS_CLOSE - Date.now();
         st.classList.add('waiting');
@@ -910,10 +910,8 @@
       $('#srcInfo').textContent = ` Feed seq ${model.seq}${model.relayedAt ? `, relay checked ${time(model.relayedAt)}` : ''}${model.changedAt ? `, last change ${time(model.changedAt)}` : ''}.`;
     }
     notice.hidden = !note; notice.innerHTML = note;
-    const fresh = [];
-    if (lastOk) fresh.push(`Checked ${ago(Date.now() - lastOk)}`);
-    if (model?.generatedAt && model.mayor.pollsReceived > 0) fresh.push(`City updated ${model.generatedAt.toLocaleTimeString('en-CA', { timeZone: TZ, hour: 'numeric', minute: '2-digit', second: '2-digit' })}`);
-    $('#fresh').textContent = fresh.join(' · ');
+    // When this page last checked; the City's own update time is in the status text once results start.
+    $('#fresh').textContent = lastOk ? `checked ${ago(Date.now() - lastOk)}` : '';
   }
 
   const COLS = [

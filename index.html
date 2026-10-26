@@ -103,8 +103,6 @@ td .meter { margin-top: 3px; }
 .status.waiting i { background: var(--proj); }
 .status.loading i { animation: pulse-dim 1.2s ease-in-out infinite; }
 @keyframes pulse-dim { 50% { opacity: .3; } }
-.about-btn { border: 1px solid var(--border); background: var(--surface); color: var(--ink-2); border-radius: 999px; padding: 3px 11px; font: 600 12px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif; cursor: pointer; }
-.about-btn:hover { color: var(--ink); background: var(--surface-2); }
 .theme-btn { display: inline-flex; align-items: center; gap: 5px; }
 .theme-btn svg { width: 13px; height: 13px; flex: none; }
 .skeleton { display: grid; gap: 10px; padding: 4px 0; list-style: none; }
@@ -334,11 +332,8 @@ td .sub2 { color: var(--muted); font-size: 11px; margin-top: 1px; font-variant-n
 
 @media (min-width: 1400px) { header.top { flex-wrap: nowrap; } .stats { flex-wrap: nowrap; } }
 /* Mid-size desktops: theme and share become icon-only so the stats keep their room. */
-@media (min-width: 901px) and (max-width: 1599px) { #themeBtn .lbl { display: none; } #themeBtn { padding: 3px 8px; } }
+@media (min-width: 901px) and (max-width: 1599px) { #themeBtn .lbl { display: none; } #themeBtn { padding: 0; width: 30px; } }
 /* Share stands out: filled, always labelled. */
-.share-btn { background: var(--s1); border-color: var(--s1); color: #fff; padding: 3px 12px; }
-.share-btn:hover { background: color-mix(in srgb, var(--s1) 85%, #000); border-color: transparent; color: #fff; }
-.share-btn:focus-visible { outline: 2px solid var(--s1); outline-offset: 2px; }
 .stat .st { text-transform: none; letter-spacing: 0; }
 .stat .st-projected { color: var(--proj); font-weight: 650; }
 .stat .st-decided, .stat .st-official { color: var(--good-fill); font-weight: 650; }
@@ -621,9 +616,18 @@ svg#map .me-halo { fill: var(--proj); opacity: .25; transform-box: fill-box; tra
 body.watching .toast { bottom: 120px; }
 
 /* "Checked 5s ago · City updated 9:14:02 p.m.": our check vs the City's own file time, so a pause is easy to place. */
-.status-wrap { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; }
-.fresh { padding-left: 10px; font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+/* Header: one status chip (what's happening │ when we last checked) and a small toolbar. */
+.status { height: 30px; padding: 0 12px; font-size: 12.5px; }
+.fresh { display: inline-flex; align-items: center; height: 14px; margin-left: 4px; padding-left: 10px; border-left: 1px solid var(--border); font-size: 11.5px; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .fresh:empty { display: none; }
+.hdr-actions { display: inline-flex; align-items: center; gap: 6px; }
+.hbtn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 30px; padding: 0 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--ink-2); font: 600 12.5px/1 system-ui, -apple-system, "Segoe UI", sans-serif; cursor: pointer; white-space: nowrap; }
+.hbtn:hover { color: var(--ink); background: var(--surface-2); }
+.hbtn:focus-visible { outline: 2px solid var(--s1); outline-offset: 2px; }
+.hbtn svg { width: 14px; height: 14px; flex: none; }
+#themeBtn { min-width: 30px; }
+.hbtn.share-btn { background: var(--s1); border-color: var(--s1); color: #fff; }
+.hbtn.share-btn:hover { background: color-mix(in srgb, var(--s1) 85%, #000); border-color: transparent; color: #fff; }
 .wards-leading { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; font-size: 12px; color: var(--muted); margin: 2px 0 8px; }
 .wards-leading .wl { display: inline-flex; align-items: center; gap: 5px; color: var(--ink-2); }
 .wards-leading .wl b { color: var(--ink); font-variant-numeric: tabular-nums; }
@@ -665,11 +669,12 @@ body.watching .toast { bottom: 120px; }
     <h1>Toronto 2026 Municipal Election</h1>
     <div class="sub">Unofficial results - mayor, council and school trustees</div>
   </div>
-  <div class="status-wrap"><button id="status" class="status" type="button"><i></i><span id="statusText">Connecting to results…</span></button>
-  <span id="fresh" class="fresh"></span></div>
-  <button id="aboutBtn" class="about-btn" type="button">About</button>
-  <button id="themeBtn" class="about-btn theme-btn" type="button"></button>
-  <button id="shareBtn" class="about-btn theme-btn share-btn" type="button"><span id="shareIco"></span><span id="shareLbl" class="lbl">Share</span></button>
+  <button id="status" class="status" type="button"><i></i><span id="statusText">Connecting to results…</span><span id="fresh" class="fresh"></span></button>
+  <div class="hdr-actions">
+    <button id="aboutBtn" class="hbtn" type="button">About</button>
+    <button id="themeBtn" class="hbtn theme-btn" type="button"></button>
+    <button id="shareBtn" class="hbtn theme-btn share-btn" type="button"><span id="shareIco"></span><span id="shareLbl" class="lbl">Share</span></button>
+  </div>
   <div class="stats" id="stats"></div>
 </header>
 <div id="notice" class="banner" hidden></div>
@@ -796,6 +801,6 @@ body.watching .toast { bottom: 120px; }
 
 <div id="tip" role="tooltip"></div>
 <div id="callTip" role="tooltip"></div>
-<script src="app.js?v=20261026-map1"></script>
+<script src="app.js?v=20261026-hdr1"></script>
 </body>
 </html>
