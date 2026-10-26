@@ -8,32 +8,26 @@ const ORIGINS = ['https://ndroo.github.io', 'http://localhost:8765'];
 const CACHE_MS = 15000;
 
 const memo = new Map(); // path -> { body, etag, lastModified, fetchedAt }
-const inflight = new Map();
 
+// Each request does its own upstream fetch when the cached copy is stale. Workers must not await a promise
+// started by a different request (it can hang forever if that request is cancelled), so nothing async is shared.
 async function load(path) {
   const hit = memo.get(path);
   if (hit && Date.now() - hit.fetchedAt < CACHE_MS) return hit;
-  if (inflight.has(path)) return inflight.get(path);
-  const p = (async () => {
-    try {
-      const headers = hit?.etag ? { 'If-None-Match': hit.etag } : {};
-      const r = await fetch(UPSTREAM + path, { headers, cf: { cacheTtl: 10, cacheEverything: true } });
-      if (r.status === 304 && hit) { hit.fetchedAt = Date.now(); return hit; }
-      if (!r.ok) throw new Error(`upstream ${r.status}`);
-      const body = await r.text();
-      JSON.parse(body); // never pass on a truncated file
-      const entry = { body, etag: r.headers.get('ETag'), lastModified: r.headers.get('Last-Modified'), fetchedAt: Date.now() };
-      memo.set(path, entry);
-      return entry;
-    } catch (e) {
-      if (hit) return { ...hit, stale: String(e.message || e) };
-      throw e;
-    } finally {
-      inflight.delete(path);
-    }
-  })();
-  inflight.set(path, p);
-  return p;
+  try {
+    const headers = hit?.etag ? { 'If-None-Match': hit.etag } : {};
+    const r = await fetch(UPSTREAM + path, { headers, signal: AbortSignal.timeout(8000) });
+    if (r.status === 304 && hit) { hit.fetchedAt = Date.now(); return hit; }
+    if (!r.ok) throw new Error(`upstream ${r.status}`);
+    const body = await r.text();
+    JSON.parse(body); // never pass on a truncated file
+    const entry = { body, etag: r.headers.get('ETag'), lastModified: r.headers.get('Last-Modified'), fetchedAt: Date.now() };
+    memo.set(path, entry);
+    return entry;
+  } catch (e) {
+    if (hit) return { ...hit, stale: String(e.message || e) };
+    throw e;
+  }
 }
 
 export default {

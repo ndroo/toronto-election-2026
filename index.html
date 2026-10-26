@@ -82,6 +82,17 @@ td .meter { margin-top: 3px; }
 .status i { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
 .status.live i { background: #0ca30c; box-shadow: 0 0 0 3px color-mix(in srgb, #0ca30c 25%, transparent); animation: pulse 2s infinite; }
 .status.stale i, .status.error i { background: var(--critical); }
+.status { font-family: inherit; cursor: default; }
+.status.waiting { cursor: pointer; }
+.status.waiting i { background: var(--proj); }
+.status.loading i { animation: pulse-dim 1.2s ease-in-out infinite; }
+@keyframes pulse-dim { 50% { opacity: .3; } }
+.about-btn { border: 1px solid var(--border); background: var(--surface); color: var(--ink-2); border-radius: 999px; padding: 3px 11px; font: 600 12px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif; cursor: pointer; }
+.about-btn:hover { color: var(--ink); background: var(--surface-2); }
+.skeleton { display: grid; gap: 10px; padding: 4px 0; list-style: none; }
+.skeleton i { display: block; height: 14px; border-radius: 4px; background: linear-gradient(90deg, var(--grid) 0%, var(--surface-2) 50%, var(--grid) 100%); background-size: 200% 100%; animation: shimmer 1.4s linear infinite; }
+.skeleton i:nth-child(3n) { width: 70%; } .skeleton i:nth-child(3n+1) { width: 88%; }
+@keyframes shimmer { to { background-position: -200% 0; } }
 @keyframes pulse { 50% { box-shadow: 0 0 0 6px transparent; } }
 .banner { padding: 8px 16px; font-size: 13px; background: var(--warn-bg); border-bottom: 1px solid var(--border); }
 .banner.demo { background: var(--demo); color: #fff; font-weight: 600; text-align: center; }
@@ -316,8 +327,10 @@ footer.disclaimer a, footer.disclaimer .linkish { color: var(--ink-2); font-size
 .welcome-wait p:last-child { margin: 0; }
 .welcome-wait { text-align: center; padding: 16px 14px 14px; }
 .cd-label { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 600; }
-.cd { font-size: 40px; font-weight: 700; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; margin: 4px 0 6px; color: var(--ink); }
-.cd small { font-size: 18px; font-weight: 600; color: var(--muted); margin-left: 1px; }
+.cd { display: flex; justify-content: center; gap: 10px; margin: 10px 0 12px; }
+.cd-tile { width: 84px; padding: 10px 0 8px; border-radius: 10px; background: var(--surface); border: 1px solid var(--border); display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.cd-tile b { font-size: 30px; line-height: 1; font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: -0.02em; color: var(--ink); }
+.cd-tile span { font-size: 10.5px; text-transform: uppercase; letter-spacing: .07em; color: var(--muted); font-weight: 600; }
 .cd-wait { font-size: 17px; font-weight: 650; margin: 8px 0 8px; display: flex; align-items: center; justify-content: center; gap: 10px; color: var(--ink); }
 .spinner { width: 18px; height: 18px; border: 2.5px solid var(--axis); border-top-color: var(--proj); border-radius: 50%; animation: spin .9s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
@@ -350,7 +363,8 @@ footer.disclaimer a, footer.disclaimer .linkish { color: var(--ink-2); font-size
     <h1>Toronto 2026 Municipal Election</h1>
     <div class="sub">Unofficial results - mayor, council and school trustees</div>
   </div>
-  <span id="status" class="status"><i></i><span id="statusText">Loading...</span></span>
+  <button id="status" class="status" type="button"><i></i><span id="statusText">Connecting to results…</span></button>
+  <button id="aboutBtn" class="about-btn" type="button">About</button>
   <div class="stats" id="stats"></div>
 </header>
 <div id="notice" class="banner" hidden></div>
@@ -374,7 +388,7 @@ footer.disclaimer a, footer.disclaimer .linkish { color: var(--ink-2); font-size
     <section class="card" id="cityCard">
       <div class="card-head"><h2>Mayor - city-wide</h2><span class="meta" id="cityMeta"></span></div>
       <div id="cityCall"></div>
-      <div class="scroller"><ul class="cands dense" id="cityList"></ul></div>
+      <div class="scroller"><ul class="cands dense" id="cityList"><li class="skeleton"><i></i><i></i><i></i><i></i><i></i><i></i></li></ul></div>
     </section>
   </div>
 

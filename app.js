@@ -330,7 +330,7 @@
         if (src.base) {
           // Cloudflare Worker: CORS pass-through of the two City files, fetched in parallel.
           const get = async (f) => {
-            const r = await fetch(`${src.base}/${f}`, { cache: 'no-cache' });
+            const r = await fetch(`${src.base}/${f}`, { cache: 'no-cache', signal: AbortSignal.timeout(10000) });
             if (!r.ok) throw new Error(`${src.id}: HTTP ${r.status}`);
             return { json: await r.json(), at: r.headers.get('X-Fetched-At') };
           };
@@ -338,7 +338,7 @@
           usedSource = src.id;
           return { all: a.json, wardbyward: w.json, relayedAt: [a.at, w.at].filter(Boolean).sort()[0] || null };
         }
-        const r = await fetch(src.url, { cache: 'no-cache', headers: src.headers || {} });
+        const r = await fetch(src.url, { cache: 'no-cache', headers: src.headers || {}, signal: AbortSignal.timeout(10000) });
         if (src.id === 'api' && (r.status === 403 || r.status === 429)) {
           const reset = int(r.headers.get('x-ratelimit-reset')) * 1000;
           apiBlockedUntil = reset > Date.now() ? reset : Date.now() + 5 * 60 * 1000;
@@ -654,7 +654,7 @@
     const n = hover || pinned;
     $('#tabWard').textContent = pinned;
     const el = $('#panel-ward');
-    if (!model || !n) { el.innerHTML = '<div class="empty">Hover or tap a ward on the map.</div>'; return; }
+    if (!model || !n) { el.innerHTML = `<div class="skeleton">${'<i></i>'.repeat(8)}</div>`; return; }
     const w = model.wards[n] || { name: geo.wards[n]?.name };
     const rep = w.mayor || w.council;
     // Keep each list's scroll position when the panel re-renders for the same ward.
@@ -716,8 +716,8 @@
     st.className = 'status';
     let note = '';
     if (!model) {
-      st.classList.add('error');
-      tx.textContent = lastErr ? 'Results unavailable - retrying' : 'Loading...';
+      st.classList.add(lastErr ? 'error' : 'loading');
+      tx.textContent = lastErr ? 'Results unavailable - retrying' : 'Connecting to results…';
       if (lastErr) note = `Could not load results: ${esc(lastErr.message)}. Retrying every ${POLL_MS / 1000}s.`;
     } else {
       const r = model.mayor;
@@ -727,7 +727,11 @@
       else if (!DEMO && relayAge > STALE_MS) { st.classList.add('stale'); tx.textContent = `Relay delayed - last checked ${ago(relayAge)}`; }
       else if (r.complete) { st.classList.add('live'); tx.textContent = `All polls in · ${gen}`; }
       else if (r.pollsReceived > 0) { st.classList.add('live'); tx.textContent = `Live · ${gen}`; }
-      else { tx.textContent = 'Waiting for results · polls close 8 p.m.'; }
+      else {
+        const ms = POLLS_CLOSE - Date.now();
+        st.classList.add('waiting');
+        tx.textContent = ms > 0 ? `Polls close in ${Math.floor(ms / 3600e3)}h ${Math.floor((ms % 3600e3) / 60e3)}m` : 'Polls closed · waiting for first results';
+      }
       st.title = `Feed generated ${gen}`;
       if (usedSource === 'raw') note = 'GitHub API limit reached for your network - using a backup copy that can lag up to 5 minutes.';
       $('#srcInfo').textContent = ` Feed seq ${model.seq}${model.relayedAt ? `, relay checked ${time(model.relayedAt)}` : ''}${model.changedAt ? `, last change ${time(model.changedAt)}` : ''}.`;
@@ -829,8 +833,9 @@
     if (phase === 'countdown') {
       const sec = Math.max(0, Math.floor((POLLS_CLOSE - Date.now()) / 1000));
       const hh = Math.floor(sec / 3600), mm = String(Math.floor((sec % 3600) / 60)).padStart(2, '0'), ss = String(sec % 60).padStart(2, '0');
-      box.innerHTML = `<div class="cd-label">Polls close at 8 p.m. in</div>
-        <div class="cd">${hh}<small>h</small> ${mm}<small>m</small> ${ss}<small>s</small></div>
+      const tile = (v, l) => `<div class="cd-tile"><b>${String(v).padStart(2, '0')}</b><span>${l}</span></div>`;
+      box.innerHTML = `<div class="cd-label">Polls close at 8 p.m.</div>
+        <div class="cd">${tile(hh, hh === 1 ? 'hour' : 'hours')}${tile(mm, 'minutes')}${tile(ss, 'seconds')}</div>
         <p>Keep this open and it will switch to live results by itself once counting starts.</p>`;
     } else if (phase === 'waiting') {
       box.innerHTML = `<div class="cd-label">Polls are closed</div>
@@ -842,15 +847,24 @@
     if (welcomed || DEMO) return;
     welcomed = true;
     try { if (sessionStorage.getItem('welcomed')) return; sessionStorage.setItem('welcomed', '1'); } catch {}
+    openWelcome();
+  }
+  // Also opened from the header's About button and the status pill.
+  function openWelcome() {
     const dlg = $('#welcome');
-    if (!dlg?.showModal) return;
-    dlg.addEventListener('close', () => clearInterval(welcomeTimer), { once: true });
-    dlg.addEventListener('click', (e) => { if (e.target === dlg) dlg.close(); }); // click outside closes
+    if (!dlg?.showModal || dlg.open) return;
+    delete dlg.dataset.phase;
+    clearInterval(welcomeTimer);
     dlg.showModal();
     renderWelcome();
     welcomeTimer = setInterval(renderWelcome, 1000);
     $('#welcomeGo').focus();
   }
+
+  $('#welcome').addEventListener('close', () => clearInterval(welcomeTimer));
+  $('#welcome').addEventListener('click', (e) => { if (e.target === $('#welcome')) $('#welcome').close(); }); // click outside closes
+  $('#aboutBtn').addEventListener('click', openWelcome);
+  $('#status').addEventListener('click', () => { if (!hasResults()) openWelcome(); });
 
   // ---------- boot ----------
   if (DEMO) $('#demoBanner').hidden = false;
