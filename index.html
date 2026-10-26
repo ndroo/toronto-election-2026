@@ -170,7 +170,8 @@ svg#map .lbl { font-size: 15px; font-weight: 650; text-anchor: middle; dominant-
 #tip.on { opacity: 1; }
 #tip h3 { margin: 0 0 2px; font-size: 13px; }
 #tip .sec { margin-top: 7px; font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); display: flex; justify-content: space-between; }
-#tip .r { display: grid; grid-template-columns: 10px 1fr auto auto; gap: 6px; align-items: center; }
+#tip .r { display: grid; grid-template-columns: 22px 1fr auto auto; gap: 7px; align-items: center; padding: 2px 0; }
+#tip .av { width: 20px; height: 20px; margin: 0; }
 #tip .r .votes { color: var(--ink-2); }
 #tip .r .pct { min-width: 44px; text-align: right; font-weight: 600; }
 
@@ -301,6 +302,28 @@ footer.disclaimer a, footer.disclaimer .linkish { color: var(--ink-2); font-size
 .disclaimer-box p { margin: 0 0 6px; }
 .disclaimer-box p:last-child { margin: 0; }
 
+/* Welcome dialog */
+#welcome { border: 1px solid var(--border); border-radius: 14px; padding: 0; width: min(520px, calc(100vw - 32px)); background: var(--surface); color: var(--ink); box-shadow: 0 24px 64px rgba(0,0,0,.3); }
+#welcome::backdrop { background: rgba(0,0,0,.35); backdrop-filter: blur(2px); }
+#welcome form { padding: 22px 24px 18px; }
+#welcome h2 { margin: 0 0 8px; font-size: 20px; letter-spacing: -0.01em; }
+#welcome p { margin: 0 0 10px; color: var(--ink-2); line-height: 1.5; }
+#welcome a { color: var(--ink); }
+.welcome-list { margin: 0 0 12px; padding-left: 18px; color: var(--ink-2); line-height: 1.5; font-size: 13.5px; }
+.welcome-list li { margin-bottom: 6px; }
+.welcome-wait { background: var(--surface-2); border-radius: 10px; padding: 12px 14px; margin: 4px 0 14px; }
+.welcome-wait p { margin: 0 0 4px; }
+.welcome-wait p:last-child { margin: 0; }
+.countdown { color: var(--ink) !important; font-variant-numeric: tabular-nums; }
+.countdown span { color: var(--ink-2); margin-left: 6px; }
+.welcome-actions { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; }
+.btn { font: 600 14px/1 system-ui, -apple-system, "Segoe UI", sans-serif; padding: 10px 16px; border-radius: 8px; border: 1px solid var(--axis); background: var(--surface); color: var(--ink) !important; cursor: pointer; text-decoration: none; }
+.btn:hover { background: var(--surface-2); }
+.btn.primary { background: var(--ink); color: var(--surface) !important; border-color: var(--ink); }
+.btn.primary:hover { filter: brightness(1.15); }
+.welcome-fine { font-size: 11.5px; color: var(--muted) !important; margin: 12px 0 0 !important; }
+.banner.demo .demo-exit { color: #fff; margin-left: 10px; text-decoration: underline; }
+
 /* About */
 .about { color: var(--ink-2); font-size: 13px; }
 .about > * { max-width: 78ch; }
@@ -315,7 +338,7 @@ footer.disclaimer a, footer.disclaimer .linkish { color: var(--ink-2); font-size
 </style>
 </head>
 <body>
-<div id="demoBanner" class="banner demo" hidden>DEMO DATA - randomly generated to preview the layout. These are NOT real results.</div>
+<div id="demoBanner" class="banner demo" hidden>DEMO DATA - randomly generated to preview the layout. These are NOT real results. <a href="./" class="demo-exit">Back to live results &rarr;</a></div>
 <header class="top">
   <div>
     <h1>Toronto 2026 Municipal Election</h1>
@@ -378,6 +401,27 @@ footer.disclaimer a, footer.disclaimer .linkish { color: var(--ink-2); font-size
   <span>Provided as is, without representations or warranties; no responsibility for the data</span>
   <span>Official: <a href="https://www.toronto.ca/city-government/elections/">toronto.ca/elections</a></span>
 </footer>
+
+<dialog id="welcome" aria-labelledby="welcomeTitle">
+  <form method="dialog">
+    <h2 id="welcomeTitle">Toronto 2026 election results</h2>
+    <p>Live, unofficial results for mayor, city council and school trustees, straight from the City of Toronto's results feed. An ad-free page by <a href="https://andrewmcgrath.info">Andrew McGrath</a>.</p>
+    <ul class="welcome-list">
+      <li><b>Map:</b> hover a ward to see its council race and how it voted for mayor; click to pin it.</li>
+      <li><b>Race calls</b> like <span class="call call-projected">&#9670; Projected winner</span> are this page's own estimates. Hover any badge to see why, or read the Methodology tab.</li>
+      <li>Results are unofficial until certified by the City Clerk. See <a href="https://www.toronto.ca/city-government/elections/">toronto.ca/elections</a> for official results.</li>
+    </ul>
+    <div id="welcomeWait" class="welcome-wait" hidden>
+      <p class="countdown"><b>Polls close at 8 p.m.</b> <span id="countdown"></span></p>
+      <p>Results start coming in shortly after. Leave this page open and it will update by itself, about every 30 seconds.</p>
+    </div>
+    <div class="welcome-actions">
+      <a id="welcomeDemo" class="btn" href="?demo" hidden>Explore a demo</a>
+      <button id="welcomeGo" class="btn primary" value="close">View results</button>
+    </div>
+    <p class="welcome-fine">Provided as is, without representations or warranties.</p>
+  </form>
+</dialog>
 
 <div id="tip" role="tooltip"></div>
 <div id="callTip" role="tooltip"></div>

@@ -259,7 +259,7 @@
 
       <section id="m-photos"><h3>Candidate photos</h3>
       <p>Photos were taken from each candidate's own campaign website or social page, as listed on the <a href="https://www.toronto.ca/city-government/elections/candidate-list/">City's candidate list</a>, and cropped automatically around the face. Each crop was then checked by hand, and images that weren't clearly a headshot of the candidate were dropped. Candidates without a usable photo are shown with their initials. If a photo is wrong, contact <a href="https://andrewmcgrath.info">Andrew McGrath</a>.</p>
-      <p>On the map, the Mayor and Council views show the leading candidate's photo at each ward's centre. When the race there is close (the runner-up has at least ${FACE_CLOSE * 100}% of the leader's votes), a smaller photo of the runner-up appears behind. Wards whose leader has no photo show just the ward number. Use the Faces switch under the map to turn photos off.</p>
+      <p>On the map, the Mayor and Council views show the leading candidate's photo at each ward's centre. Wards whose leader has no photo show just the ward number. Use the Faces switch under the map to turn photos off.</p>
       </section>
 
       <section id="m-limits"><h3>Limits</h3>
@@ -405,6 +405,7 @@
       lastOk = Date.now(); lastErr = null;
       assignColours();
       renderAll();
+      maybeWelcome();
     } catch (e) {
       lastErr = e;
       console.warn('[results]', e);
@@ -498,9 +499,8 @@
     renderLegend();
   }
 
-  // Leader's photo at each ward's centre (mayor and council views). A smaller runner-up appears behind
-  // only when the race is close. Wards whose leader has no photo just show the ward number.
-  const FACE_CLOSE = 0.85; // runner-up shown when they have at least 85% of the leader's votes
+  // Leader's photo at each ward's centre (mayor and council views).
+  // Wards whose leader has no photo just show the ward number.
   let showFaces = true;
   try { showFaces = localStorage.getItem('faces') !== 'off'; } catch {}
   function renderFaces() {
@@ -510,13 +510,11 @@
     for (const [num, g] of Object.entries(geo.wards)) {
       const lbl = svg.querySelector(`.lbl[data-n="${num}"]`);
       const r = on ? (mode === 'mayor' ? model.wards[num]?.mayor : model.wards[num]?.council) : null;
-      const [a, b] = r?.leader && !r.tied ? r.cands : [];
+      const a = r?.leader && !r.tied ? r.cands[0] : null;
       const pa = a && photoOf(r.pkey, a.name);
       if (!pa) { lbl.setAttribute('y', g.ly); lbl.classList.remove('small'); continue; }
       const r1 = clamp(wardSize[num] * 0.15, 16, 28);
       const faces = [{ c: a, ph: pa, rad: r1, x: g.lx, y: g.ly, lead: true }];
-      const pb = b && b.votes >= a.votes * FACE_CLOSE && photoOf(r.pkey, b.name);
-      if (pb) faces.unshift({ c: b, ph: pb, rad: r1 * 0.72, x: g.lx + r1 * 0.95, y: g.ly - r1 * 0.35 });
       for (const f of faces) {
         const ring = mode === 'mayor' ? (candColour(f.c.name) || css('--other')) : css(f.lead ? '--ink' : '--surface');
         const id = `fc${clipId++}`;
@@ -594,7 +592,7 @@
     if (!r) return '<div class="empty">No data</div>';
     return r.cands.slice(0, n).map((c) => {
       const col = colour ? candColour(c.name) : null;
-      return `<div class="r"><i class="sw" style="width:9px;height:9px;border-radius:2px;background:${col || 'transparent'}"></i><span class="nm">${esc(c.name)}</span><span class="votes">${fmt(c.votes)}</span><span class="pct">${pct(c.pct)}</span></div>`;
+      return `<div class="r">${avatar(r.pkey, c.name, col)}<span class="nm">${esc(c.name)}</span><span class="votes">${fmt(c.votes)}</span><span class="pct">${pct(c.pct)}</span></div>`;
     }).join('') + (r.cands.length > n ? `<div style="color:var(--muted);margin-top:2px">+ ${r.cands.length - n} more in side panel</div>` : '');
   }
   function renderTip() {
@@ -800,6 +798,32 @@
     flashNow = false;
   }
 
+  // ---------- welcome dialog ----------
+  // Shown once per tab. Before any polls report it offers the demo or waiting for live results.
+  const POLLS_CLOSE = Date.parse('2026-10-26T20:00:00-04:00');
+  let welcomed = false;
+  function maybeWelcome() {
+    if (welcomed || DEMO) return;
+    welcomed = true;
+    try { if (sessionStorage.getItem('welcomed')) return; sessionStorage.setItem('welcomed', '1'); } catch {}
+    const dlg = $('#welcome');
+    if (!dlg?.showModal) return;
+    const waiting = !model || model.mayor.pollsReceived === 0;
+    $('#welcomeWait').hidden = !waiting;
+    $('#welcomeDemo').hidden = !waiting;
+    $('#welcomeGo').textContent = waiting ? 'Wait for live results' : 'View results';
+    const tickDown = () => {
+      const ms = POLLS_CLOSE - Date.now();
+      $('#countdown').textContent = ms > 0 ? `in ${Math.floor(ms / 3600e3)}h ${Math.floor((ms % 3600e3) / 60e3)}m` : '- counting has started';
+    };
+    tickDown();
+    const t = setInterval(tickDown, 30000);
+    dlg.addEventListener('close', () => clearInterval(t), { once: true });
+    dlg.addEventListener('click', (e) => { if (e.target === dlg) dlg.close(); }); // click outside closes
+    dlg.showModal();
+    $('#welcomeGo').focus();
+  }
+
   // ---------- boot ----------
   if (DEMO) $('#demoBanner').hidden = false;
   matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => model && renderAll());
@@ -817,6 +841,7 @@
     tick();
     setInterval(tick, POLL_MS);
     setInterval(renderStatus, 1000);
+    setTimeout(maybeWelcome, 4000); // still greet people if the first load is slow or fails
     document.addEventListener('visibilitychange', () => { if (!document.hidden) tick(); });
   });
 })();
