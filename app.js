@@ -760,8 +760,19 @@
         <div class="pc-bar"><i data-bk="${k}" style="width:${(c.pct / max) * 100}%;${col ? `background:${col}` : ''}"></i></div>
       </div>`;
     }).join('');
+    const list = cityView === 'list';
+    $('#cityList').innerHTML = list ? candList(r, { colour: true }) : '';
+    $('#cityCard').classList.toggle('all', list);
+    for (const b of document.querySelectorAll('#cityViewSw button')) b.setAttribute('aria-pressed', String(b.dataset.v === cityView));
     updateCityArrows();
   }
+  // Cards (default) or the full ranked list; remembered on this device.
+  let cityView = store.get('cityView') === 'list' ? 'list' : 'cards';
+  $('#cityViewSw').addEventListener('click', (e) => {
+    const b = e.target.closest('button'); if (!b) return;
+    cityView = b.dataset.v; store.set('cityView', cityView);
+    if (model) renderCity();
+  });
   // Five cards fit at once; the rest are a sideways scroll (trackpad, swipe or the arrows).
   function updateCityArrows() {
     const el = $('#cityTop');
@@ -906,8 +917,8 @@
   function renderTabs() {
     $('#wardTabs').innerHTML = openWards.map((n) => {
       const sel = tab === 'ward' && n === pinned;
-      return `<button role="tab" class="wt" data-tab="ward" data-w="${n}" aria-selected="${sel}" title="Ward ${n} - ${esc(geo?.wards[n]?.name || '')}">${n === myWard ? PIN_SVG : ''}Ward ${n}${openWards.length > 1 ? `<span class="wt-x" data-close="${n}" role="button" aria-label="Close Ward ${n}">&times;</span>` : ''}</button>`;
-    }).join('') + (openWards.length < 2 ? '<span class="tab-hint">Click wards on the map to compare them side by side</span>' : '');
+      return `<button role="tab" class="wt" data-tab="ward" data-w="${n}" aria-selected="${sel}" title="Ward ${n} - ${esc(geo?.wards[n]?.name || '')}. Click other wards on the map to open more tabs.">${n === myWard ? PIN_SVG : ''}Ward ${n}${openWards.length > 1 ? `<span class="wt-x" data-close="${n}" role="button" aria-label="Close Ward ${n}">&times;</span>` : ''}</button>`;
+    }).join('');
   }
   const PIN_SVG = '<svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><path d="M8 1.5a4.5 4.5 0 0 0-4.5 4.5c0 3.3 4.5 8.5 4.5 8.5s4.5-5.2 4.5-8.5A4.5 4.5 0 0 0 8 1.5Zm0 6.2a1.7 1.7 0 1 1 0-3.4 1.7 1.7 0 0 1 0 3.4Z" fill="currentColor"/></svg>';
 

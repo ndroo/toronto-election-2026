@@ -356,15 +356,19 @@ footer.disclaimer a, footer.disclaimer .linkish { color: var(--ink-2); font-size
 .tabs .wt-x { display: inline-grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; color: var(--muted); font-size: 14px; line-height: 1; }
 .tabs .wt-x:hover { background: var(--surface-2); color: var(--ink); }
 .tab-sep { width: 1px; align-self: center; height: 18px; background: var(--grid); margin: 0 6px; flex: none; }
-.tab-hint { align-self: center; font-size: 11.5px; color: var(--muted); padding: 0 8px; white-space: nowrap; }
 
 /* City-wide top five */
-.podium { display: grid; grid-auto-flow: column; grid-auto-columns: calc((100% - 32px) / 5); gap: 8px; margin: 8px 0 2px; flex: 1; min-height: 0; overflow-x: auto; overflow-y: hidden; scroll-snap-type: x mandatory; scroll-padding: 0; scrollbar-width: none; }
+.podium { display: grid; grid-auto-flow: column; grid-auto-columns: calc((100% - 32px) / 5); gap: 8px; margin: 8px 0 2px; flex: 1; min-height: 0; overflow-x: auto; overflow-y: hidden; scroll-snap-type: x mandatory; scroll-padding: 0 2px; scrollbar-width: none; padding: 3px 2px 6px; margin-left: -2px; margin-right: -2px; }
 .podium::-webkit-scrollbar { display: none; }
 .podium .pc { scroll-snap-align: start; }
 #cityCard { position: relative; }
 #cityCard.more-right .podium { -webkit-mask-image: linear-gradient(90deg, #000 92%, transparent); mask-image: linear-gradient(90deg, #000 92%, transparent); }
 .city-nav { display: inline-flex; gap: 4px; }
+#cityCard.all .city-nav { display: none; }
+.view-sw { display: inline-flex; border: 1px solid var(--border); border-radius: 999px; padding: 2px; gap: 2px; }
+.view-sw button { border: 0; background: none; border-radius: 999px; padding: 3px 10px; font: 600 11.5px/1.2 system-ui, -apple-system, "Segoe UI", sans-serif; color: var(--muted); cursor: pointer; }
+.view-sw button[aria-pressed="true"] { background: var(--ink); color: var(--surface); }
+#cityCard .card-head { align-items: center; }
 .city-nav button { width: 26px; height: 26px; border-radius: 50%; border: 1px solid var(--border); background: var(--surface); color: var(--ink); font-size: 17px; line-height: 1; cursor: pointer; display: grid; place-items: center; padding: 0 0 2px; }
 .city-nav button:hover:not(:disabled) { background: var(--surface-2); }
 .city-nav button:disabled { opacity: .35; cursor: default; }
@@ -516,7 +520,7 @@ svg#map .me-halo { fill: var(--proj); opacity: .25; transform-box: fill-box; tra
     </section>
 
     <section class="card" id="cityCard">
-      <div class="card-head"><h2>Mayor - city-wide</h2><span class="city-nav"><button id="cityPrev" type="button" aria-label="Previous candidates">&lsaquo;</button><button id="cityNext" type="button" aria-label="More candidates">&rsaquo;</button></span><span class="meta" id="cityMeta"></span></div>
+      <div class="card-head"><h2>Mayor - city-wide</h2><span class="view-sw" id="cityViewSw" role="group" aria-label="View"><button data-v="cards" aria-pressed="true">Cards</button><button data-v="list" aria-pressed="false">List</button></span><span class="city-nav"><button id="cityPrev" type="button" aria-label="Previous candidates">&lsaquo;</button><button id="cityNext" type="button" aria-label="More candidates">&rsaquo;</button></span><span class="meta" id="cityMeta"></span></div>
       <div id="cityCall"></div>
       <div class="podium" id="cityTop"></div>
       <div class="scroller"><ul class="cands dense" id="cityList"><li class="skeleton"><i></i><i></i><i></i><i></i><i></i><i></i></li></ul></div>
@@ -605,6 +609,6 @@ svg#map .me-halo { fill: var(--proj); opacity: .25; transform-box: fill-box; tra
 
 <div id="tip" role="tooltip"></div>
 <div id="callTip" role="tooltip"></div>
-<script src="app.js?v=20261026x"></script>
+<script src="app.js?v=20261026z"></script>
 </body>
 </html>
