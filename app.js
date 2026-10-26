@@ -197,7 +197,7 @@
   };
   const badge = (call) => call ? `<button class="call call-${call.status}" data-status="${call.status}" data-reason="${esc(call.reason)}" aria-label="${CALL_LABEL[call.status].replace(/&[^;]+;\s*/g, '')}: ${esc(call.reason)}. Show explanation.">${CALL_LABEL[call.status]}<span class="i" aria-hidden="true">i</span></button>` : '';
   // Status pill + plain sentence about the lead, then the reason underneath.
-  function callRow(r) {
+  function callRow(r, { reason = true } = {}) {
     if (!r) return '';
     const [a, b] = r.cands;
     let txt;
@@ -206,7 +206,7 @@
     else if (r.tied) txt = `<b>${esc(a.name)}</b> and <b>${esc(b.name)}</b> are tied at ${fmt(a.votes)}`;
     else if (!b) txt = `<b>${esc(a.name)}</b> is the only candidate`;
     else txt = `<b>${esc(a.name)}</b> leads ${esc(b.name)} by <b>${fmt(a.votes - b.votes)}</b> votes (${(a.pct - b.pct).toFixed(1)} pts)`;
-    return `<div class="callrow">${badge(r.call)}<span class="lead-txt">${txt}</span></div>${why(r.call)}`;
+    return `<div class="callrow">${badge(r.call)}<span class="lead-txt">${txt}</span></div>${reason ? why(r.call) : ''}`;
   }
   const why = (call) => call && call.status !== 'awaiting' ? `<div class="call-why">${esc(call.reason)}</div>` : '';
 
@@ -710,7 +710,7 @@
       <div class="ward-head">
         <div class="ward-title"><span class="wn">Ward ${n}</span><span class="wname">${esc(w.name || '')}</span>
           ${String(n) === myWard ? '<span class="you-tag">Your ward</span>' : ''}
-          <span class="pinned">${hover && hover !== pinned ? 'preview · click to pin' : 'pinned'}</span></div>
+          ${hover && hover !== pinned ? '<span class="pinned">Previewing · click to pin</span>' : ''}</div>
         <div class="ward-sub">${rep ? `<span class="ws"><span class="wt wt-polls">${fmt(rep.pollsReceived)}/${fmt(rep.polls)} polls · ${pct(rep.polls ? (rep.pollsReceived / rep.polls) * 100 : 0, 0)}</span>${meter(rep.polls ? rep.pollsReceived / rep.polls : 0, rep.complete)}</span>
           <span class="ws"><span class="wt wt-turn">Turnout ${pct(rep.totalVoters ? (rep.votes / rep.totalVoters) * 100 : 0)}</span>${meter(rep.totalVoters ? rep.votes / rep.totalVoters : 0)}</span>
           <span>${fmt(rep.totalVoters)} electors</span>` : ''}</div>
@@ -736,23 +736,32 @@
       <div class="call-why">The mayor's race is called on the city-wide count (left), not ward by ward.</div>`;
   }
 
+  // City-wide mayor: the top five as cards (they're who matters on the night), with the full field one click away.
+  const TOP_N = 5;
+  let cityAll = false;
   function renderCity() {
     const r = model.mayor;
     $('#cityMeta').textContent = raceMeta(r);
-    $('#cityCall').innerHTML = callRow(r);
-    $('#cityList').innerHTML = candList(r, { colour: true });
-  }
-
-  // Header mayor stat: the leader's name, with what kind of lead it is spelled out underneath.
-  function mayorStat(r) {
+    $('#cityCall').innerHTML = callRow(r, { reason: false }); // the reason is in the badge's hover card; space is tight here
     const st = r.call?.status;
-    const name = r.leader && !r.tied ? esc(r.leader.name) : '';
-    const blank = '<span class="meter blank"></span>';
-    if (!name) return ['Mayor', st === 'tied' ? 'Tied' : 'Results after 8 p.m.', blank];
-    const v = { projected: `&#9670; ${name}`, decided: `&#10003; ${name}`, official: `&#10003; ${name}` }[st] || name;
-    const l = { projected: 'projected winner', decided: 'winner (unofficial)', official: 'official winner' }[st] || 'ahead, not called yet';
-    return [`Mayor · <span class="st st-${st}">${l}</span>`, v, blank];
+    const max = Math.max(1, ...r.cands.map((c) => c.pct));
+    $('#cityTop').innerHTML = r.cands.slice(0, TOP_N).map((c, i) => {
+      const k = esc(`city|${c.name}`), col = candColour(c.name);
+      const lead = i === 0 && r.leader && !r.tied;
+      const tag = lead && CALLED.has(st) ? `<span class="tag tag-${st}">${{ projected: 'Projected', decided: 'Winner', official: 'Official', acclaimed: 'Acclaimed' }[st]}</span>` : '';
+      return `<div class="pc${lead ? ' first' : ''}" data-fk="${k}" title="${esc(c.name)}: ${fmt(c.votes)} votes (${pct(c.pct, 2)})">
+        <span class="pc-rank">${i + 1}</span><span class="delta">${c.delta ? `+${fmt(c.delta)}` : ''}</span>
+        ${avatar('mayor', c.name, col)}
+        <div class="pc-name">${esc(c.name)}</div>${tag}
+        <div class="pc-nums"><b data-ok="pp|${k}">${pct(c.pct)}</b><span data-ok="pv|${k}">${fmt(c.votes)}</span></div>
+        <div class="pc-bar"><i data-bk="${k}" style="width:${(c.pct / max) * 100}%;${col ? `background:${col}` : ''}"></i></div>
+      </div>`;
+    }).join('');
+    $('#cityList').innerHTML = cityAll ? candList(r, { colour: true }) : '';
+    $('#cityMore').textContent = cityAll ? `Show top ${TOP_N}` : `See all ${r.cands.length} candidates`;
+    $('#cityCard').classList.toggle('all', cityAll);
   }
+  $('#cityMore').addEventListener('click', () => { cityAll = !cityAll; renderCity(); });
 
   function renderStats() {
     const r = model.mayor;
@@ -761,13 +770,12 @@
     const council = wards.map((w) => w.council?.call?.status);
     const called = council.filter((x) => CALLED.has(x)).length;
     const s = [
-      mayorStat(r),
       ['Council called', `${called}/${wards.length}`, meter(wards.length ? called / wards.length : 0, called === wards.length)],
       [`Polls reporting · ${pct(r.polls ? (r.pollsReceived / r.polls) * 100 : 0, 0)}`, `${fmt(r.pollsReceived)}/${fmt(r.polls)}`, meter(r.polls ? r.pollsReceived / r.polls : 0, r.complete)],
       ['Wards complete', `${wardsDone}/${wards.length}`, meter(wards.length ? wardsDone / wards.length : 0, wards.length > 0 && wardsDone === wards.length)],
       [`Turnout · ${compact(r.votes)} of ${compact(r.totalVoters)}`, pct(r.totalVoters ? (r.votes / r.totalVoters) * 100 : 0), meter(r.totalVoters ? r.votes / r.totalVoters : 0)],
     ];
-    $('#stats').innerHTML = s.map(([k, v, m], i) => `<div class="stat"><b${i ? ` data-ok="s|${i}"` : ''}>${v}</b>${m}<span>${k}</span></div>`).join('');
+    $('#stats').innerHTML = s.map(([k, v, m], i) => `<div class="stat"><b data-ok="s|${i}">${v}</b>${m}<span>${k}</span></div>`).join('');
   }
 
   function renderStatus() {
@@ -812,13 +820,15 @@
       const x = col.v(a), y = col.v(b);
       return (typeof x === 'string' ? x.localeCompare(y) : x - y) * sort.dir || a.num - b.num;
     });
+    // Every row gets the leader's photo (initials if none). Mayor: ring in their map colour.
+    // Council: a status badge like the map's (blue ◆ projected, green ✓ winner, dashed grey not called).
     const who = (r, colour) => {
-      if (!r?.leader) return '<span style="color:var(--muted)">-</span>';
-      if (r.tied) return 'Tied';
-      const c = colour ? candColour(r.leader.name) || css('--other') : null;
-      const st = r.call?.status;
-      const ico = CALLED.has(st) ? `<span class="ico ico-${st}" aria-label="${st}">${st === 'projected' ? '&#9670;' : '&#10003;'}</span>` : '';
-      return `<span class="who">${c ? `<i style="background:${c}"></i>` : ''}${ico}${esc(r.leader.name)}</span>`;
+      if (!r?.leader) return `<span class="who"><span class="avw"><span class="av av-i av-none"></span></span><span class="who-n muted">No votes yet</span></span>`;
+      const c = r.cands[0], st = r.call?.status;
+      const ring = colour ? (r.tied ? css('--other') : candColour(c.name) || css('--other')) : null;
+      const badge = colour ? '' : `<span class="sb sb-${CALLED.has(st) ? st : 'pending'}">${st === 'projected' ? '&#9670;' : CALLED.has(st) ? '&#10003;' : ''}</span>`;
+      const name = r.tied ? `Tied: ${esc(c.name)} &amp; ${esc(r.cands[1].name)}` : esc(c.name);
+      return `<span class="who"><span class="avw">${avatar(r.pkey, c.name, ring)}${badge}</span><span class="who-n">${name}</span></span>`;
     };
     t.innerHTML = `<thead><tr>${COLS.map((c) => `<th data-k="${c.key}"${c.n ? ' class="n"' : ''}${sort.key === c.key ? ` aria-sort="${sort.dir > 0 ? 'ascending' : 'descending'}"` : ''}>${c.label}</th>`).join('')}</tr></thead>
       <tbody>${rows.map((w) => {
@@ -873,7 +883,9 @@
   const MOVE_MS = 1600;
   function snapshot() {
     const pos = new Map(), bars = new Map();
-    for (const el of document.querySelectorAll('[data-fk]')) if (el.offsetParent) pos.set(el.dataset.fk, el.getBoundingClientRect().top);
+    for (const el of document.querySelectorAll('[data-fk]')) {
+      if (el.offsetParent) { const b = el.getBoundingClientRect(); pos.set(el.dataset.fk, { top: b.top, left: b.left, idx: [...el.parentNode.children].indexOf(el) }); }
+    }
     for (const el of document.querySelectorAll('[data-bk]')) bars.set(el.dataset.bk, el.style.width);
     return { pos, bars };
   }
@@ -911,12 +923,12 @@
       if (motion && before != null && before !== now && el.offsetParent) el.innerHTML = rollHTML(before, now, startFor(el));
     }
     if (!motion) {
-      for (const el of document.querySelectorAll('.cand .delta')) { const row = el.closest('[data-fk]')?.dataset.fk; if (row) deltaPrev.set(row, el.textContent); }
+      for (const el of document.querySelectorAll('[data-fk] .delta')) { const row = el.closest('[data-fk]')?.dataset.fk; if (row) deltaPrev.set(row, el.textContent); }
       return;
     }
     // New-vote deltas ("+123"): the previous figure stays until the row's turn in the stream, then
     // crossfades to the new one (or fades away if the row got no new votes).
-    for (const el of document.querySelectorAll('.cand .delta')) {
+    for (const el of document.querySelectorAll('[data-fk] .delta')) {
       const row = el.closest('[data-fk]')?.dataset.fk;
       if (!row) continue;
       const now = el.textContent, before = deltaPrev.get(row) || '';
@@ -941,21 +953,25 @@
     for (const el of document.querySelectorAll('[data-fk]')) {
       const before = snap.pos.get(el.dataset.fk);
       if (before == null || !el.offsetParent) continue;
-      const dy = before - el.getBoundingClientRect().top;
-      if (Math.abs(dy) < 2) continue;
+      // Only rows that changed rank move; rows nudged by a neighbour's layout stay put.
+      if ([...el.parentNode.children].indexOf(el) === before.idx) continue;
+      const now = el.getBoundingClientRect(), newIdx = [...el.parentNode.children].indexOf(el);
+      const dy = before.top - now.top, dx = before.left - now.left;
+      if (Math.abs(dy) < 2 && Math.abs(dx) < 2) continue;
+      const climbing = newIdx < before.idx;
       // Rows climbing the list pass over the ones they overtake; each waits in its old spot until its turn.
-      el.style.position = 'relative'; el.style.zIndex = dy > 0 ? '2' : '1'; el.style.background = 'var(--surface)';
+      el.style.position = 'relative'; el.style.zIndex = climbing ? '2' : '1'; el.style.background = 'var(--surface)';
       // Tinted by direction (green climbing, red dropping). The tint fades in while the row's numbers roll,
       // holds while it slides to its new place, then fades out after it lands.
       const surface = css('--surface');
-      const tint = mix(dy > 0 ? '#0ca30c' : '#d03b3b', surface, 0.2);
+      const tint = mix(climbing ? '#0ca30c' : '#d03b3b', surface, 0.2);
       const shadow = '0 6px 18px rgba(0,0,0,.14)', none = '0 0 0 rgba(0,0,0,0)';
       const FADE_MS = 1100, total = ROLL_PHASE_MS + MOVE_MS + FADE_MS;
       el.animate([
-        { transform: `translateY(${dy}px)`, background: surface, boxShadow: none },
-        { offset: ROLL_PHASE_MS / total, transform: `translateY(${dy}px)`, background: tint, boxShadow: shadow, easing: EASE },
-        { offset: (ROLL_PHASE_MS + MOVE_MS) / total, transform: 'translateY(0)', background: tint, boxShadow: none },
-        { transform: 'translateY(0)', background: surface, boxShadow: none },
+        { transform: `translate(${dx}px, ${dy}px)`, background: surface, boxShadow: none },
+        { offset: ROLL_PHASE_MS / total, transform: `translate(${dx}px, ${dy}px)`, background: tint, boxShadow: shadow, easing: EASE },
+        { offset: (ROLL_PHASE_MS + MOVE_MS) / total, transform: 'translate(0, 0)', background: tint, boxShadow: none },
+        { transform: 'translate(0, 0)', background: surface, boxShadow: none },
       ], { duration: total, delay: rowStart.get(el.dataset.fk) ?? startFor(el), fill: 'backwards' })
         .onfinish = () => { el.style.zIndex = ''; el.style.background = ''; };
     }

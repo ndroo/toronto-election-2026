@@ -118,8 +118,8 @@ main {
   .races { flex: 1; min-height: 0; }
   .race { display: flex; flex-direction: column; min-height: 0; }
   .race .scroller { flex: 1; min-height: 0; overflow: auto; margin-right: -8px; padding-right: 8px; }
-  svg#map { max-height: 37vh; }
-  #mapCard .card-head { margin-bottom: 4px; }
+  svg#map { max-height: 31vh; }
+  #mapCard .card-head { margin-bottom: 4px; align-items: center; }
 }
 @media (max-width: 900px) {
   main { grid-template-columns: minmax(0, 1fr); padding: 10px 12px 24px; }
@@ -196,7 +196,7 @@ svg#map .lbl { font-size: 15px; font-weight: 650; text-anchor: middle; dominant-
 
 /* Race lists */
 .ward-head { flex: none; margin-bottom: 10px; }
-.ward-title { display: flex; align-items: baseline; gap: 8px; white-space: nowrap; overflow: hidden; }
+.ward-title { display: flex; align-items: center; gap: 8px; white-space: nowrap; overflow: hidden; }
 .ward-title .wn { font-size: 22px; font-weight: 700; letter-spacing: -0.02em; }
 .ward-title .wname { font-size: 18px; font-weight: 650; overflow: hidden; text-overflow: ellipsis; }
 .ward-title .pinned { font-size: 11px; color: var(--muted); }
@@ -256,7 +256,21 @@ tbody tr { cursor: pointer; }
 tbody tr:hover, tbody tr.hot { background: var(--surface-2); }
 tbody tr.pinned { box-shadow: inset 3px 0 0 var(--ink); }
 .who { display: inline-flex; align-items: center; gap: 6px; }
-.who i { width: 9px; height: 9px; border-radius: 2px; display: inline-block; }
+.who i { width: 9px; height: 9px; border-radius: 2px; display: inline-block; flex: none; }
+.who { gap: 9px; }
+.avw { position: relative; display: inline-flex; flex: none; }
+.who .av, .table-key .av { width: 26px; height: 26px; margin: 0; }
+.av-none { background: var(--grid); }
+.who-n.muted { color: var(--muted); }
+.sb { position: absolute; right: -4px; bottom: -3px; width: 13px; height: 13px; border-radius: 50%; display: grid; place-items: center; font-size: 7.5px; color: #fff; border: 1.5px solid var(--surface); box-sizing: border-box; }
+.sb-projected { background: var(--proj); }
+.sb-decided, .sb-official, .sb-acclaimed { background: var(--good-fill); }
+.sb-pending { background: var(--surface); border: 1.5px dashed var(--axis); }
+.sb-key { position: static; display: inline-grid; vertical-align: -2px; margin-right: 3px; }
+.table-key { position: sticky; bottom: -12px; z-index: 3; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 16px; margin: 8px -14px -12px; padding: 9px 14px 11px; background: var(--surface); border-top: 1px solid var(--grid); font-size: 12px; color: var(--ink-2); }
+.table-key > span { display: inline-flex; align-items: center; gap: 4px; }
+.table-key .av { width: 16px; height: 16px; margin-right: 4px; }
+.who-n { white-space: nowrap; }
 .prog { display: inline-block; width: 46px; height: 5px; background: var(--grid); border-radius: 3px; overflow: hidden; vertical-align: 1px; margin-right: 6px; }
 .prog i { display: block; height: 100%; background: var(--ink-2); }
 .done { color: var(--good); font-weight: 600; }
@@ -295,7 +309,7 @@ td .sub2 { color: var(--muted); font-size: 11px; margin-top: 1px; font-variant-n
 .call-why { font-size: 11.5px; color: var(--muted); margin: 3px 0 6px; line-height: 1.35; }
 #cityCard .card-head .call { align-self: center; }
 .stat .call { align-self: flex-start; margin: 1px 0; }
-.stat:first-child { min-width: 170px; }
+
 @media (min-width: 1200px) { header.top { flex-wrap: nowrap; } .stats { flex-wrap: nowrap; } }
 .stat .st { text-transform: none; letter-spacing: 0; }
 .stat .st-projected { color: var(--proj); font-weight: 650; }
@@ -305,7 +319,6 @@ td .sub2 { color: var(--muted); font-size: 11px; margin-top: 1px; font-variant-n
 .ico { display: inline-block; width: 14px; text-align: center; font-size: 11px; margin-right: 2px; }
 .ico-projected { color: var(--proj); }
 .ico-decided, .ico-official { color: var(--good-fill); font-weight: 700; }
-.table-key { color: var(--muted); font-size: 12px; margin: 10px 0 0; }
 .linkish { border: 0; background: none; padding: 0; color: var(--ink); text-decoration: underline; cursor: pointer; font-size: 12px; }
 dl.calls { display: grid; grid-template-columns: max-content 1fr; gap: 10px 14px; margin: 12px 0; align-items: start; }
 dl.calls dt { margin: 0; padding-top: 1px; }
@@ -330,6 +343,30 @@ footer.disclaimer a, footer.disclaimer .linkish { color: var(--ink-2); font-size
 .disclaimer-box { border: 1px solid var(--axis); border-radius: 8px; padding: 10px 12px; background: var(--surface-2); }
 .disclaimer-box p { margin: 0 0 6px; }
 .disclaimer-box p:last-child { margin: 0; }
+
+/* City-wide top five */
+.podium { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; margin: 8px 0 2px; }
+.pc { position: relative; border: 1px solid var(--border); border-radius: 12px; padding: 8px 7px 8px; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 3px; background: var(--surface); min-width: 0; }
+.pc.first { border-color: color-mix(in srgb, var(--ink) 28%, transparent); box-shadow: 0 2px 10px rgba(0,0,0,.06); }
+.pc-rank { position: absolute; top: 5px; left: 8px; font-size: 11px; font-weight: 700; color: var(--muted); font-variant-numeric: tabular-nums; }
+.pc .delta { position: absolute; top: 5px; right: 7px; color: var(--good); font-size: 10px; font-weight: 600; display: grid; justify-items: end; font-variant-numeric: tabular-nums; }
+.pc .delta .dl { grid-area: 1 / 1; }
+.pc .av { width: 34px; height: 34px; margin: 2px 0 2px; }
+.pc.first .av { width: 38px; height: 38px; margin-top: 0; }
+.pc .av-i { font-size: 11px; }
+.pc-name { font-size: 12px; font-weight: 600; line-height: 1.2; height: 2.4em; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
+.pc.first .pc-name { font-weight: 700; }
+.pc .tag { margin: 0; }
+.pc-nums { display: flex; align-items: baseline; justify-content: center; gap: 5px; font-variant-numeric: tabular-nums; line-height: 1.25em; white-space: nowrap; }
+.pc-nums b { font-size: 15px; font-weight: 700; }
+.pc-nums span { font-size: 11px; color: var(--muted); }
+.pc-bar { width: 100%; height: 3px; background: var(--grid); border-radius: 2px; overflow: hidden; margin-top: 3px; }
+.pc-bar i { display: block; height: 100%; background: var(--bar); border-radius: 2px; }
+.see-all { border: 0; background: none; color: var(--ink-2); font: 600 12px/1 system-ui, -apple-system, "Segoe UI", sans-serif; cursor: pointer; padding: 3px 6px; border-radius: 6px; text-decoration: underline; text-underline-offset: 3px; text-decoration-color: var(--axis); }
+.see-all:hover { color: var(--ink); }
+#cityCard:not(.all) .scroller { display: none; }
+#cityCard.all .podium { display: none; }
+@media (max-width: 560px) { .podium { grid-template-columns: repeat(3, minmax(0, 1fr)); } .podium .pc:nth-child(n+4) { display: none; } }
 
 /* Find my ward */
 .find-btn { display: inline-flex; align-items: center; gap: 5px; border: 1px solid var(--border); background: var(--surface); color: var(--ink-2); border-radius: 999px; padding: 4px 11px; font: 600 12px/1.3 system-ui, -apple-system, "Segoe UI", sans-serif; cursor: pointer; white-space: nowrap; }
@@ -455,8 +492,9 @@ svg#map .me-halo { fill: var(--proj); opacity: .25; transform-box: fill-box; tra
     </section>
 
     <section class="card" id="cityCard">
-      <div class="card-head"><h2>Mayor - city-wide</h2><span class="meta" id="cityMeta"></span></div>
+      <div class="card-head"><h2>Mayor - city-wide</h2><button id="cityMore" class="see-all" type="button">See all candidates</button><span class="meta" id="cityMeta"></span></div>
       <div id="cityCall"></div>
+      <div class="podium" id="cityTop"></div>
       <div class="scroller"><ul class="cands dense" id="cityList"><li class="skeleton"><i></i><i></i><i></i><i></i><i></i><i></i></li></ul></div>
     </section>
   </div>
@@ -470,7 +508,13 @@ svg#map .me-halo { fill: var(--proj); opacity: .25; transform-box: fill-box; tra
     </nav>
     <div class="panel" id="panel-ward" role="tabpanel" aria-live="polite"></div>
     <div class="panel" id="panel-wards" role="tabpanel" hidden><table id="wardTable"></table>
-      <p class="table-key"><span class="ico ico-projected">&#9670;</span> Projected winner &nbsp; <span class="ico ico-decided">&#10003;</span> Winner (unofficial) &nbsp; <button class="linkish" data-goto="m-calls">How races are called</button></p></div>
+      <div class="table-key">
+        <span><span class="avw"><span class="av av-i av-none" style="box-shadow:0 0 0 2px var(--s1)"></span></span> Mayor leader in that ward (ring = map colour)</span>
+        <span><span class="sb sb-pending sb-key"></span> Not called</span>
+        <span><span class="sb sb-projected sb-key">&#9670;</span> Projected</span>
+        <span><span class="sb sb-decided sb-key">&#10003;</span> Winner</span>
+        <button class="linkish" data-goto="m-calls">How races are called</button>
+      </div></div>
     <div class="panel" id="panel-school" role="tabpanel" hidden>
       <div class="board-tabs" id="boardTabs" role="group" aria-label="School board"></div>
       <p class="board-note">Trustee wards are drawn differently from the 25 city wards, so they are not shown on the map.</p>
@@ -535,6 +579,6 @@ svg#map .me-halo { fill: var(--proj); opacity: .25; transform-box: fill-box; tra
 
 <div id="tip" role="tooltip"></div>
 <div id="callTip" role="tooltip"></div>
-<script src="app.js?v=20261026n"></script>
+<script src="app.js?v=20261026s"></script>
 </body>
 </html>
