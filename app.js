@@ -1,9 +1,12 @@
-/* Toronto 2026 election results - static client.
+/* Toronto election results - static client.
  *
- * Data path: City feed -> GitHub Actions relay (scripts/relay.py) -> `data` branch bundle.json
- * -> this page, via the GitHub contents API (CORS-enabled, conditional requests) with
- * raw.githubusercontent.com as a fallback when the API rate limit is hit.
+ * Data path: City feed -> results Worker (worker/worker.js) -> this page, one /live.json request per poll
+ * (both City files plus the news feed). In archive mode the page reads the frozen copies in final/ instead.
+ * Election dates and settings live in election.js; race calls come from worker/feed.js, shared with the feed.
  */
+import { ELECTION, CALL, STORAGE_PREFIX } from './election.js';
+import * as feedLib from './worker/feed.js';
+
 (() => {
   'use strict';
 
@@ -25,24 +28,18 @@
   // ---------- config ----------
   const params = new URLSearchParams(location.search);
   const DEMO = params.has('demo');
-  const [OWNER, REPO] = (() => {
-    const m = location.hostname.match(/^([^.]+)\.github\.io$/);
-    if (m) return [m[1], location.pathname.split('/').filter(Boolean)[0] || `${m[1]}.github.io`];
-    return ['ndroo', 'toronto-election-2026'];
-  })();
+  // ?replay plays election night back from the saved copies of the City's feed (replay/, see scripts/replay-pack.sh).
+  const REPLAY = !DEMO && params.has('replay');
+  const SIM = DEMO || REPLAY; // not the real, current results: no welcome box, nothing remembered
   // After the election the results are frozen into final/ (scripts/freeze.sh) and served as static files, so the
-  // page needs no Worker and costs nothing to keep online. Set to false to go live again (see docs/REVIVE.md).
-  const ARCHIVE = true;
-  const POLL_MS = DEMO ? 9000 : ARCHIVE ? 10 * 60 * 1000 : 30000;
-  const SOURCES = params.get('src')
-    ? [{ id: 'custom', url: params.get('src') }]
-    : ARCHIVE && !DEMO ? [{ id: 'final', base: 'final' }]
-    : [
-        { id: 'worker', base: params.get('worker') || 'https://toronto-election-2026.andrewjohnmcgrath.workers.dev' },
-        { id: 'api', url: `https://api.github.com/repos/${OWNER}/${REPO}/contents/bundle.json?ref=data`,
-          headers: { Accept: 'application/vnd.github.raw+json' } },
-        { id: 'raw', url: `https://raw.githubusercontent.com/${OWNER}/${REPO}/data/bundle.json` },
-      ];
+  // page needs no Worker and costs nothing to keep online. Switched in election.js (see docs/REVIVE.md).
+  const ARCHIVE = ELECTION.archive && !SIM && !params.has('worker'); // ?worker=<url> reads a live Worker anyway, for testing
+  const POLL_MS = DEMO ? 9000 : REPLAY ? 4000 : ARCHIVE ? 10 * 60 * 1000 : 30000;
+  const SOURCE = params.get('src') ? { id: 'custom', url: params.get('src') }
+    : REPLAY ? { id: 'replay', base: 'replay' }
+    : params.has('worker') ? { id: 'worker', base: params.get('worker') }
+    : ARCHIVE || (DEMO && ELECTION.archive) ? { id: 'final', base: 'final' }
+    : { id: 'worker', base: ELECTION.worker };
   const STALE_MS = 7 * 60 * 1000;
   // Anonymous random id per browser, sent to the Worker so it can count live and daily viewers.
   const VIEWER = (() => {
@@ -53,11 +50,10 @@
       return v;
     } catch { return fresh(); }
   })();
-  // Race-call thresholds. The About tab explains them using these same values.
-  const CALL = { minReporting: 0.25, safety: 1.5, needShare: 0.75, swing: 0.30 };
-  // The City's feed never marks results official. When the City Clerk certifies the election,
-  // set `certified` to the date (e.g. 'October 28, 2026') and every call becomes "Official winner".
-  const OFFICIAL = { certified: null, url: 'https://www.toronto.ca/city-government/elections/election-results-reports/election-results/' };
+  // The City's feed never marks results official. Once the City Clerk certifies the election, `certified` in
+  // election.js turns every call into "Official winner".
+  const OFFICIAL = { certified: ELECTION.certified, url: ELECTION.certifiedUrl };
+  const { POLLS_CLOSE, CLOSE_TIME } = feedLib;
   const TZ = 'America/Toronto';
 
   // ---------- helpers ----------
@@ -83,7 +79,7 @@
   let geo = null;
   let model = null;
   let prevVotes = new Map();
-  let lastOk = 0, lastErr = null, apiBlockedUntil = 0, usedSource = null;
+  let lastOk = 0, lastErr = null;
   const colorOf = new Map(); // mayoral candidate name -> slot (1..3); sticky so colours follow the person
   const hash = new URLSearchParams(location.hash.slice(1));
   let mode = ['mayor', 'support', 'council', 'reporting', 'turnout'].includes(hash.get('m')) ? hash.get('m') : 'mayor';
@@ -92,6 +88,13 @@
   const store = {
     get: (k) => { try { return localStorage.getItem(k); } catch { return null; } },
     set: (k, v) => { try { localStorage.setItem(k, v); } catch {} },
+  };
+  // What this browser has seen of this election (feed posts read, the winner celebrated, the thank-you card).
+  // Named per election so the next one starts fresh; kept in memory only for the demo and replay.
+  const simMemory = new Map();
+  const seen = {
+    get: (k) => (SIM ? simMemory.get(k) ?? null : store.get(STORAGE_PREFIX + k)),
+    set: (k, v) => (SIM ? simMemory.set(k, v) : store.set(STORAGE_PREFIX + k, v)),
   };
   let myWard = store.get('myWard');
   let pinned = hash.get('w') || params.get('w') || store.get('lastWard') || myWard || '1';
@@ -206,25 +209,21 @@
 
   // ---------- race calls ----------
   // status: awaiting | early | close | tied | projected | decided | official, with a plain-English reason.
+  // The rule itself is assessRace() in worker/feed.js, which the live feed uses too; this adds the reasons.
   function callRace(r, estLeft) {
     if (!r || !r.cands.length) return null;
     const [a, b] = r.cands;
     if (OFFICIAL.certified && r.leader && !r.tied) return { status: 'official', reason: `Certified by the City Clerk on ${OFFICIAL.certified}` };
-    if (!b) return { status: 'acclaimed', reason: 'Only candidate in this race, so elected by acclamation when nominations closed' };
-    if (!r.leader || !r.pollsReceived) return { status: 'awaiting', reason: 'No polls reported yet' };
-    if (r.tied) return { status: 'tied', reason: `Tied at ${fmt(a.votes)} votes each` };
-    if (r.complete) return { status: 'decided', reason: `All ${fmt(r.polls)} polls reported - unofficial until certified` };
-    const gap = a.votes - b.votes;
-    const maxLeft = Math.max(0, r.totalVoters - (r.ballots ?? r.votes));
-    if (gap > maxLeft) return { status: 'decided', reason: `Lead of ${fmt(gap)} is bigger than all ${fmt(maxLeft)} electors not yet counted` };
-    const left = Math.min(maxLeft, (estLeft ?? (r.votes / r.pollsReceived) * (r.polls - r.pollsReceived)) * CALL.safety);
-    const topTwo = r.votes ? left * ((a.votes + b.votes) / r.votes) : 0;
-    const need = topTwo > 0 ? (topTwo + gap) / (2 * topTwo) : Infinity;
-    const hasNow = b.votes / (a.votes + b.votes); // runner-up's share of the top-two vote so far
-    const why = `${b.name} would need ${need > 1 ? 'more than all' : `${Math.round(need * 100)}%`} of an estimated ${fmt(Math.round(topTwo))} votes still to come between the top two, and has ${Math.round(hasNow * 100)}% so far`;
-    const rep = r.pollsReceived / r.polls;
-    if (rep < CALL.minReporting) return { status: 'early', need, reason: `Only ${pct(rep * 100, 0)} of polls are in. Calls start at ${CALL.minReporting * 100}%.` };
-    return { status: need >= CALL.needShare || need - hasNow >= CALL.swing ? 'projected' : 'close', need, reason: why };
+    const x = feedLib.assessRace({ ...r, rec: r.pollsReceived }, estLeft);
+    switch (x.status) {
+      case 'acclaimed': return { status: 'acclaimed', reason: 'Only candidate in this race, so elected by acclamation when nominations closed' };
+      case 'awaiting': return { status: 'awaiting', reason: 'No polls reported yet' };
+      case 'tied': return { status: 'tied', reason: `Tied at ${fmt(a.votes)} votes each` };
+      case 'decided': return { status: 'decided', reason: x.gap != null ? `Lead of ${fmt(x.gap)} is bigger than all ${fmt(x.maxLeft)} electors not yet counted` : `All ${fmt(r.polls)} polls reported - unofficial until certified` };
+      case 'early': return { status: 'early', need: x.need, reason: `Only ${pct(x.rep * 100, 0)} of polls are in. Calls start at ${CALL.minReporting * 100}%.` };
+    }
+    const why = `${b.name} would need ${x.need > 1 ? 'more than all' : `${Math.round(x.need * 100)}%`} of an estimated ${fmt(Math.round(x.topTwo))} votes still to come between the top two, and has ${Math.round(x.hasNow * 100)}% so far`;
+    return { status: x.status, need: x.need, reason: why };
   }
   const CALL_LABEL = { acclaimed: '&#10003; Acclaimed', official: '&#10003; Official winner', decided: '&#10003; Winner &middot; unofficial', projected: '&#10003; Projected winner', close: 'Too close to call', early: 'Too early to call', tied: 'Tied', awaiting: 'No results yet' };
   const CALLED = new Set(['projected', 'decided', 'official', 'acclaimed']);
@@ -394,38 +393,56 @@
   const candColour = (name) => (colorOf.has(name) ? css(`--s${colorOf.get(name)}`) : null);
 
   // ---------- fetching ----------
+  // One request per poll from the Worker: { fetchedAt, all, wardbyward, feed }. The frozen final/ files are static
+  // and free, so archive mode reads them separately.
   async function fetchBundle() {
-    for (const src of SOURCES) {
-      if (src.id === 'api' && Date.now() < apiBlockedUntil) continue;
-      try {
-        if (src.base) {
-          // Cloudflare Worker: CORS pass-through of the two City files, fetched in parallel.
-          const get = async (f) => {
-            const q = f === 'unofficialresult.json' && src.id === 'worker' ? `?v=${VIEWER}` : '';
-            const r = await fetch(`${src.base}/${f}${q}`, { cache: 'no-cache', signal: AbortSignal.timeout(10000) });
-            if (!r.ok) throw new Error(`${src.id}: HTTP ${r.status}`);
-            return { json: await r.json(), at: r.headers.get('X-Fetched-At') };
-          };
-          const [a, w] = await Promise.all([get('unofficialresult.json'), get('unofficialresult-wardbyward.json')]);
-          usedSource = src.id;
-          return { all: a.json, wardbyward: w.json, relayedAt: [a.at, w.at].filter(Boolean).sort()[0] || null };
-        }
-        const r = await fetch(src.url, { cache: 'no-cache', headers: src.headers || {}, signal: AbortSignal.timeout(10000) });
-        if (src.id === 'api' && (r.status === 403 || r.status === 429)) {
-          const reset = int(r.headers.get('x-ratelimit-reset')) * 1000;
-          apiBlockedUntil = reset > Date.now() ? reset : Date.now() + 5 * 60 * 1000;
-          throw new Error(`GitHub API rate limited (${r.status})`);
-        }
-        if (!r.ok) throw new Error(`${src.id}: HTTP ${r.status}`);
-        const b = await r.json();
-        if (!b.all) throw new Error(`${src.id}: bundle missing results`);
-        usedSource = src.id;
-        return b;
-      } catch (e) {
-        lastErr = e;
+    try {
+      const get = async (url) => {
+        const r = await fetch(url, { cache: 'no-cache', signal: AbortSignal.timeout(10000) });
+        if (!r.ok) throw new Error(`${SOURCE.id}: HTTP ${r.status}`);
+        return r.json();
+      };
+      if (SOURCE.id === 'worker') {
+        const b = await get(`${SOURCE.base}/live.json?v=${VIEWER}`);
+        if (b.feed?.posts) posts = b.feed.posts;
+        return { all: b.all, wardbyward: b.wardbyward, relayedAt: b.fetchedAt };
       }
+      if (SOURCE.id === 'replay') return await replayNext(get);
+      if (SOURCE.base) {
+        const [all, wardbyward] = await Promise.all([get(`${SOURCE.base}/unofficialresult.json`), get(`${SOURCE.base}/unofficialresult-wardbyward.json`)]);
+        return { all, wardbyward };
+      }
+      const b = await get(SOURCE.url);
+      if (!b.all) throw new Error(`${SOURCE.id}: bundle missing results`);
+      return b;
+    } catch (e) {
+      lastErr = e;
+      throw e;
     }
-    throw lastErr || new Error('No data source available');
+  }
+
+  // Replay: each poll steps to the next saved copy of the City's feed, starting just before the first results,
+  // with the night's real feed posts (final/feed.json) appearing as their time comes.
+  let replayList = null, replayIdx = -1, replayPaused = false, replayPosts = [], replayAt = 0;
+  async function replayNext(get) {
+    if (!replayList) {
+      const [list, f] = await Promise.all([get('replay/index.json'), get('final/feed.json').catch(() => ({ posts: [] }))]);
+      replayList = list.files;
+      replayPosts = f.posts || [];
+      replayIdx = Math.max(0, replayList.findIndex((x) => x.results) - 1);
+    } else if (!replayPaused && replayIdx < replayList.length - 1) replayIdx++;
+    const item = replayList[replayIdx];
+    const r = await fetch(`replay/${item.file}`, { signal: AbortSignal.timeout(10000) });
+    if (!r.ok) throw new Error(`replay: HTTP ${r.status}`);
+    // Saved gzipped; some servers already undo the gzip, so check before unpacking.
+    const buf = new Uint8Array(await r.arrayBuffer());
+    const text = buf[0] === 0x1f && buf[1] === 0x8b
+      ? await new Response(new Blob([buf]).stream().pipeThrough(new DecompressionStream('gzip'))).text()
+      : new TextDecoder().decode(buf);
+    replayAt = Date.parse(item.t);
+    posts = replayPosts.filter((p) => p.t <= replayAt);
+    $('#demoProg').textContent = `${new Date(replayAt).toLocaleString('en-CA', { timeZone: TZ, weekday: 'short', hour: 'numeric', minute: '2-digit' })} · ${replayIdx + 1} of ${replayList.length}`;
+    return JSON.parse(text);
   }
 
   // Simulated election night: counting starts at zero, arrives in uneven batches, holds on the final
@@ -491,8 +508,11 @@
 
   let rawBundle = null;
   async function tick() {
+    // Background tabs don't poll; coming back to the tab polls straight away (see visibilitychange below).
+    if (document.hidden && model && !SIM) return;
     try {
       if (DEMO && demoPaused && model) return;
+      if (REPLAY && replayPaused && model) return;
       if (!DEMO || !rawBundle) rawBundle = await fetchBundle();
       if (DEMO) demoLast = demoize(rawBundle);
       model = buildModel(DEMO ? demoLast : rawBundle);
@@ -1000,8 +1020,9 @@
       const gen = model.generatedAt ? `${time(model.generatedAt)} (${ago(Date.now() - model.generatedAt)})` : 'unknown';
       const relayAge = model.relayedAt ? Date.now() - model.relayedAt : 0;
       if (lastErr) { st.classList.add('error'); tx.textContent = `Connection problem - showing data from ${gen}`; }
-      else if (!DEMO && relayAge > STALE_MS) { st.classList.add('stale'); tx.textContent = `Relay delayed - last checked ${ago(relayAge)}`; }
-      else if (r.complete && ARCHIVE && !DEMO) tx.textContent = 'Final unofficial results · all polls in';
+      else if (REPLAY) { st.classList.add('live'); tx.textContent = `Replay · City update of ${hm(model.generatedAt)}`; }
+      else if (!DEMO && relayAge > STALE_MS) { st.classList.add('stale'); tx.textContent = `Results delayed - last checked ${ago(relayAge)}`; }
+      else if (r.complete && ARCHIVE) tx.textContent = 'Final unofficial results · all polls in';
       else if (r.complete) { st.classList.add('live'); tx.textContent = `All polls in · ${hm(model.generatedAt)}`; }
       else if (r.pollsReceived > 0) { st.classList.add('live'); tx.textContent = `Live · City updated ${model.generatedAt.toLocaleTimeString('en-CA', { timeZone: TZ, hour: 'numeric', minute: '2-digit', second: '2-digit' })}`; }
       else {
@@ -1011,12 +1032,11 @@
         tx.textContent = ms > 0 ? `Polls close in ${Math.floor(ms / 3600e3)}h ${p2(Math.floor((ms % 3600e3) / 60e3))}m ${p2(Math.floor((ms % 60e3) / 1000))}s` : 'Polls closed · waiting for first results';
       }
       st.title = `Feed generated ${gen}`;
-      if (usedSource === 'raw') note = 'GitHub API limit reached for your network - using a backup copy that can lag up to 5 minutes.';
-      $('#srcInfo').textContent = ` Feed seq ${model.seq}${model.relayedAt ? `, relay checked ${time(model.relayedAt)}` : ''}${model.changedAt ? `, last change ${time(model.changedAt)}` : ''}.`;
+      $('#srcInfo').textContent = ` Feed seq ${model.seq}${model.relayedAt && !REPLAY ? `, last checked ${time(model.relayedAt)}` : ''}.`;
     }
     notice.hidden = !note; notice.innerHTML = note;
     // When this page last checked; the City's own update time is in the status text once results start.
-    $('#fresh').textContent = lastOk && !(ARCHIVE && !DEMO) ? `checked ${ago(Date.now() - lastOk)}` : '';
+    $('#fresh').textContent = lastOk && !ARCHIVE && !REPLAY ? `checked ${ago(Date.now() - lastOk)}` : '';
   }
 
   const COLS = [
@@ -1189,8 +1209,8 @@
   // simulated count, with the same rules and wording (worker/feed.js), so the layout can be previewed.
   let posts = [];
   let tickerOn = store.get('ticker') !== 'off'; // the Live tab is opt-in already; the ticker can be hidden
-  let feedSeen = int(store.get('feedSeen'));
-  let feedAt = 0, feedLib = null, demoSnap = null, demoPosted = new Set(), demoId = 0;
+  let feedSeen = int(seen.get('feedSeen'));
+  let feedAt = 0, demoSnap = null, demoPosted = new Set(), demoId = 0;
   const feedTime = (t) => new Date(t).toLocaleTimeString('en-CA', { timeZone: TZ, hour: 'numeric', minute: '2-digit' });
   const KIND = {
     'pre-close': ['Polls open', ''], 'polls-closed': ['Polls closed', ''], 'first-results': ['First results', ''], milestone: ['Count', ''],
@@ -1198,20 +1218,19 @@
     'lead-change': ['Lead change', 'k-lead'], 'close-race': ['Close race', 'k-close'], call: ['Race call', 'k-call'], 'trustee-calls': ['Trustee calls', 'k-call'],
     notice: ['Update', ''], 'sign-off': ['Signing off', ''],
   };
+  // The Worker's posts arrive with the results (fetchBundle) and replay picks its own; the frozen feed is read here.
   async function loadFeed() {
     if (params.get('src')) return;
     if (DEMO) {
       if (!rawBundle || !demoLast) return;
-      feedLib ||= await import('./worker/feed.js');
       const cur = feedLib.snapshot(demoLast.all, demoLast.wardbyward, incumbents);
       if (demoSnap && cur.rec < demoSnap.rec) { posts = []; demoSnap = null; demoPosted = new Set(); } // the simulation started over
       for (const e of feedLib.diff(demoSnap, cur, 0, demoPosted)) posts.unshift({ id: ++demoId, t: Date.now(), kind: e.kind, ...feedLib.template(e) });
       demoSnap = cur;
-    } else {
+    } else if (SOURCE.id === 'final') {
       if (Date.now() - feedAt < 55000) return;
       feedAt = Date.now();
-      const base = SOURCES.find((s) => s.base)?.base;
-      const r = await fetch(`${base}/feed.json`, { cache: 'no-cache', signal: AbortSignal.timeout(10000) });
+      const r = await fetch('final/feed.json', { cache: 'no-cache', signal: AbortSignal.timeout(10000) });
       if (!r.ok) return;
       posts = (await r.json()).posts || [];
     }
@@ -1247,7 +1266,7 @@
         });
       }
     }
-    if (tab === 'feed' && latest) { feedSeen = Math.max(feedSeen, latest.id); store.set('feedSeen', String(feedSeen)); }
+    if (tab === 'feed' && latest) { feedSeen = Math.max(feedSeen, latest.id); seen.set('feedSeen', String(feedSeen)); }
     const unread = posts.filter((p) => p.id > feedSeen).length;
     $('#feedCount').hidden = !unread; $('#feedCount').textContent = unread > 99 ? '99+' : unread;
     const list = $('#posts');
@@ -1257,7 +1276,7 @@
       const won = (p.kind === 'call' || p.kind === 'trustee-calls') && !/projected/i.test(p.headline + p.body) ? ' k-won' : '';
       return `<li class="post${shown.size && !shown.has(String(p.id)) ? ' fresh' : ''}" data-id="${p.id}">
         <time>${feedTime(p.t)}</time><span class="kind ${cls}${won}">${label}</span><h4>${esc(p.headline)}</h4><p>${esc(p.body)}</p></li>`;
-    }).join('') : `<li class="empty">${Date.now() < POLLS_CLOSE ? 'Updates start when polls close at 8 p.m. They\'ll appear here as results come in.' : 'Waiting for the first results…'}</li>`;
+    }).join('') : `<li class="empty">${Date.now() < POLLS_CLOSE ? `Updates start when polls close at ${CLOSE_TIME}. They'll appear here as results come in.` : 'Waiting for the first results…'}</li>`;
     renderToWatch();
   }
   // Races to watch: the tightest races still being counted, from the page's own numbers.
@@ -1512,14 +1531,14 @@
     }
     callSeen = now;
     const m = model.mayor, st = m?.call?.status;
-    if (m?.leader && !m.tied && CALLED.has(st) && st !== 'acclaimed' && store.get('mayorCelebrated') !== m.leader.name && !document.hidden && !document.querySelector('dialog[open]')) {
-      store.set('mayorCelebrated', m.leader.name);
+    if (m?.leader && !m.tied && CALLED.has(st) && st !== 'acclaimed' && seen.get('mayorCelebrated') !== m.leader.name && !document.hidden && !document.querySelector('dialog[open]')) {
+      seen.set('mayorCelebrated', m.leader.name);
       celebrateMayor(m.leader.name, st);
     }
     // Once the mayor's race is called: the thank-you card, after the celebration has played. At most once a day per
     // browser (sooner only if the projected winner changes).
-    if (m?.leader && !m.tied && CALLED.has(st) && st !== 'acclaimed' && !thanksTimer
-      && (store.get('thanksShown') !== m.leader.name || Date.now() - int(store.get('thanksAt')) > 24 * 3600e3)) {
+    if (!SIM && m?.leader && !m.tied && CALLED.has(st) && st !== 'acclaimed' && !thanksTimer
+      && (seen.get('thanksShown') !== m.leader.name || Date.now() - int(seen.get('thanksAt')) > 24 * 3600e3)) {
       thanksTimer = setTimeout(function tryThanks() {
         if (document.hidden || document.querySelector('dialog[open]')) { thanksTimer = setTimeout(tryThanks, 3000); return; }
         showThanks();
@@ -1531,8 +1550,8 @@
     const m = model?.mayor, L = m?.leader;
     if (!L) return;
     const st = m.call?.status;
-    store.set('thanksShown', L.name);
-    store.set('thanksAt', String(Date.now()));
+    seen.set('thanksShown', L.name);
+    seen.set('thanksAt', String(Date.now()));
     $('#thanksResult').innerHTML = resultHTML();
     $('#thanks').showModal();
   }
@@ -1625,7 +1644,6 @@
   // ---------- welcome dialog ----------
   // Shown once per tab. Before results it is a live countdown to polls closing, then a "waiting for the
   // first results" screen, and it closes itself as soon as the first results arrive.
-  const POLLS_CLOSE = Date.parse('2026-10-26T20:00:00-04:00');
   let welcomed = false, welcomeTimer = null;
   const hasResults = () => !!model && model.mayor.pollsReceived > 0;
   function welcomePhase() {
@@ -1646,17 +1664,17 @@
       const sec = Math.max(0, Math.floor((POLLS_CLOSE - Date.now()) / 1000));
       const hh = Math.floor(sec / 3600), mm = String(Math.floor((sec % 3600) / 60)).padStart(2, '0'), ss = String(sec % 60).padStart(2, '0');
       const tile = (v, l) => `<div class="cd-tile"><b>${String(v).padStart(2, '0')}</b><span>${l}</span></div>`;
-      box.innerHTML = `<div class="cd-label">Polls close at 8 p.m.</div>
+      box.innerHTML = `<div class="cd-label">Polls close at ${CLOSE_TIME}</div>
         <div class="cd">${tile(hh, hh === 1 ? 'hour' : 'hours')}${tile(mm, 'minutes')}${tile(ss, 'seconds')}</div>
         <p>Keep this open and it will switch to live results by itself once counting starts.</p>`;
     } else if (phase === 'waiting') {
       box.innerHTML = `<div class="cd-label">Polls are closed</div>
         <div class="cd-wait"><span class="spinner" aria-hidden="true"></span>Waiting for the first results to come in&hellip;</div>
-        <p>The City usually starts reporting shortly after 8 p.m. This will close by itself when they arrive.</p>`;
+        <p>The City usually starts reporting shortly after ${CLOSE_TIME}. This will close by itself when they arrive.</p>`;
     }
   }
   function maybeWelcome() {
-    if (welcomed || DEMO) return;
+    if (welcomed || SIM) return;
     const ms = model?.mayor?.call?.status;
     if (ms && CALLED.has(ms) && ms !== 'acclaimed') return; // the thank-you card greets people once the result is in
     welcomed = true;
@@ -1762,6 +1780,13 @@
   $('#wardDlg').addEventListener('click', (e) => { if (e.target === $('#wardDlg')) $('#wardDlg').close(); });
 
   // ---------- boot ----------
+  if (SIM && ELECTION.archive) $('.demo-exit').innerHTML = 'Back to the final results &rarr;';
+  if (REPLAY) {
+    $('#demoBanner').hidden = false;
+    $('#demoText').textContent = 'REPLAY - election night as it happened, from the City\'s own updates.';
+    $('#demoRestart').addEventListener('click', () => { if (!replayList) return; replayIdx = Math.max(0, replayList.findIndex((x) => x.results) - 1) - 1; replayPaused = false; $('#demoPause').textContent = 'Pause'; callSeen = null; tick(); });
+    $('#demoPause').addEventListener('click', (e) => { replayPaused = !replayPaused; e.target.textContent = replayPaused ? 'Resume' : 'Pause'; });
+  }
   if (DEMO) {
     $('#demoBanner').hidden = false;
     $('#demoPause').addEventListener('click', (e) => { demoPaused = !demoPaused; e.target.textContent = demoPaused ? 'Resume' : 'Pause'; });
@@ -1809,7 +1834,7 @@
     const g = cv.getContext('2d'); g.scale(2, 2);
     g.fillStyle = v('--surface'); g.fillRect(0, 0, W, H);
     const font = (w, px) => `${w} ${px}px system-ui, -apple-system, "Segoe UI", sans-serif`;
-    g.fillStyle = v('--ink'); g.font = font(700, 34); g.fillText('Toronto 2026 election results', pad, pad + 26);
+    g.fillStyle = v('--ink'); g.font = font(700, 34); g.fillText(ELECTION.title, pad, pad + 26);
     g.font = font(600, 22); g.fillStyle = v('--ink-2');
     g.fillText(mode === 'support' ? `Mayor: ${supportName()}'s share of the vote by ward` : MODE_TITLE[mode], pad, pad + 62);
     const r = model?.mayor;
@@ -1831,10 +1856,10 @@
     g.font = font(500, 15); g.fillStyle = v('--muted');
     g.fillText('torontoelections.andrewmcgrath.info · City of Toronto unofficial results', pad, H - 30);
     const blob = await new Promise((res) => cv.toBlob(res, 'image/png'));
-    const name = `toronto-2026-${mode === 'support' ? `support-${supportName().toLowerCase().replace(/\W+/g, '-')}` : mode}.png`;
+    const name = `${ELECTION.id}-${mode === 'support' ? `support-${supportName().toLowerCase().replace(/\W+/g, '-')}` : mode}.png`;
     const file = new File([blob], name, { type: 'image/png' });
     if (matchMedia('(hover: none)').matches && navigator.canShare?.({ files: [file] })) {
-      try { await navigator.share({ files: [file], title: 'Toronto 2026 election results' }); } catch {}
+      try { await navigator.share({ files: [file], title: ELECTION.title }); } catch {}
       return;
     }
     const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name;
@@ -1844,7 +1869,7 @@
   }
   $('#legend').addEventListener('click', (e) => { if (e.target.id === 'saveMap') saveMapImage().catch((err) => { console.warn('[map image]', err); toast("Couldn't make the image"); }); });
   async function shareFollow(url, name) {
-    const data = { title: `Follow ${name} · Toronto 2026 election results`, text: `Live results for ${name}`, url };
+    const data = { title: `Follow ${name} · ${ELECTION.title}`, text: `Live results for ${name}`, url };
     if (navigator.share && (!navigator.canShare || navigator.canShare(data))) { try { await navigator.share(data); } catch {} return; }
     try { await navigator.clipboard.writeText(url); toast(`Link to follow ${name} copied`); } catch { prompt('Copy this link:', url); }
   }
@@ -1895,10 +1920,10 @@
     setInterval(tick, POLL_MS);
     setInterval(() => holdScroll(renderStatus), 1000);
     setTimeout(maybeWelcome, 4000); // still greet people if the first load is slow or fails
-    if (ARCHIVE && !DEMO) $('.tk-live').textContent = 'Recap'; // the night's posts, no longer live
+    if (ARCHIVE) $('.tk-live').textContent = 'Recap'; // the night's posts, no longer live
     if (DEMO && params.get('preview') === 'thanks') setTimeout(() => { document.querySelectorAll('dialog[open]').forEach((d) => d.close()); showThanks(); }, 2500);
     if (DEMO && params.get('preview') === 'about') setTimeout(() => { document.querySelectorAll('dialog[open]').forEach((d) => d.close()); model.mayor.call = { ...model.mayor.call, status: 'projected' }; openWelcome(); }, 2500);
-    document.addEventListener('visibilitychange', () => { if (!document.hidden) { tick(); checkVersion(); } });
+    document.addEventListener('visibilitychange', () => { if (!document.hidden && !SIM) { tick(); checkVersion(); } });
     setInterval(checkVersion, 120000);
   });
 })();

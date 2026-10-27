@@ -4,11 +4,14 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
+import { ELECTION } from '../election.js';
 
 const require = createRequire(import.meta.url);
 const puppeteer = require('puppeteer-core');
 const root = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..');
-const FEED = 'https://toronto-election-2026.andrewjohnmcgrath.workers.dev/unofficialresult.json';
+const FEED = `${ELECTION.worker}/unofficialresult.json`;
+// e.g. "Toronto 2026 election · Oct 26"
+const KICKER = `Toronto ${ELECTION.pollsClose.slice(0, 4)} election · ${new Date(ELECTION.pollsClose).toLocaleDateString('en-CA', { timeZone: 'America/Toronto', month: 'short', day: 'numeric' })}`;
 const BOARD_SHORT = { 'Toronto District School Board': 'TDSB', 'Toronto Catholic District School Board': 'TCDSB', 'Conseil scolaire Viamonde': 'Viamonde', 'Conseil scolaire catholique MonAvenir': 'MonAvenir' };
 
 // Same as the page's slug(): case, accents and punctuation don't matter.
@@ -62,7 +65,7 @@ const card = (p) => {
     svg { position: absolute; right: -20px; top: 70px; width: 520px; height: auto; }
   </style></head><body>
     <div class="left">
-      <div class="kicker"><i></i>Toronto 2026 election · Oct 26</div>
+      <div class="kicker"><i></i>${esc(KICKER)}</div>
       <div class="who">${img}<div><h1>${esc(p.name)}</h1>${p.tag ? `<span class="tag">${esc(p.tag)}</span>` : ''}</div></div>
       <div class="race">${esc(p.race)}</div>
       <div class="follow">Follow the live results</div>

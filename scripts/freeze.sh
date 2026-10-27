@@ -4,8 +4,8 @@
 set -e
 cd "$(dirname "$0")/.."
 mkdir -p final
-CITY=https://mediaresults.toronto.ca/results
-WORKER=https://toronto-election-2026.andrewjohnmcgrath.workers.dev
+CITY=$(sed -n "s/.*cityFeed: '\([^']*\)'.*/\1/p" election.js)
+WORKER=$(sed -n "s/.*worker: '\([^']*\)'.*/\1/p" election.js)
 curl -sf "$CITY/unofficialresult.json" -o final/unofficialresult.json
 curl -sf "$CITY/unofficialresult-wardbyward.json" -o final/unofficialresult-wardbyward.json
 curl -sf -H 'Origin: https://torontoelections.andrewmcgrath.info' "$WORKER/feed.json" -o final/feed.json

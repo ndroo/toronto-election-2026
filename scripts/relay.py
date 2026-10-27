@@ -1,23 +1,17 @@
 #!/usr/bin/env python3
-"""Relay the City of Toronto unofficial results feeds into the `data` branch.
+"""Archive every version of the City of Toronto unofficial results feeds on election night.
 
-The City's feed does not send CORS headers, so browsers on another origin
-cannot read it. This runs inside GitHub Actions, polls both feeds, and
-force-pushes a single-commit `data` branch holding bundle.json whenever the
-results change (plus a heartbeat so viewers can see the relay is alive).
-The feed JSON is stored byte-for-byte as received - nothing is dropped.
-
-Every change is also kept: the same bundle, gzipped, is added to the `archive`
-branch as archive/<election>/<UTC time>.json.gz (one file per change, never
-rewritten), so the night can be replayed later, e.g. as real demo data.
+Runs inside GitHub Actions (.github/workflows/relay.yml), polls both feeds, and each time the results change adds
+the pair, gzipped, to the `archive` branch as archive/<election id>/<UTC time>.json.gz (one file per change, never
+rewritten). The feed JSON is stored byte-for-byte as received. scripts/replay-pack.py turns these into the
+page's ?replay mode. The page itself reads the results Worker, not this.
 """
 import base64
 import gzip
 import hashlib
 import json
 import os
-import subprocess
-import tempfile
+import re
 import time
 import urllib.error
 import urllib.request
@@ -29,11 +23,11 @@ FEEDS = {
 }
 INTERVAL = int(os.environ.get("INTERVAL", "45"))
 DURATION = int(os.environ.get("DURATION", "3300"))
-HEARTBEAT = int(os.environ.get("HEARTBEAT", "300"))
 REPO = os.environ["GITHUB_REPOSITORY"]
 TOKEN = os.environ["GITHUB_TOKEN"]
 ARCHIVE_BRANCH = "archive"
-ELECTION = os.environ.get("ELECTION", "2026")
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+ELECTION = os.environ.get("ELECTION") or re.search(r"id: '([^']+)'", open(os.path.join(ROOT, "election.js")).read()).group(1)
 
 state = {k: {"etag": None, "lastModified": None, "text": None} for k in FEEDS}
 
@@ -107,7 +101,7 @@ def archive(body, relayed_at):
     print(f"{now()} archived {path}")
 
 
-def push(changed_at, changed=False):
+def save(changed_at):
     bundle = {
         "relayedAt": now(),
         "changedAt": changed_at,
@@ -116,40 +110,25 @@ def push(changed_at, changed=False):
         },
     }
     body = json.dumps(bundle)[:-1]
-    # Splice the raw feed text in unchanged so the published copy is exactly what the City served.
+    # Splice the raw feed text in unchanged so the saved copy is exactly what the City served.
     body += "".join(f',"{k}":{state[k]["text"] or "null"}' for k in FEEDS) + "}"
-    with tempfile.TemporaryDirectory() as d:
-        open(os.path.join(d, "bundle.json"), "w").write(body)
-        git = lambda *a: subprocess.run(["git", "-C", d, *a], check=True, capture_output=True)
-        git("init", "-q", "-b", "data")
-        git("add", "bundle.json")
-        git("-c", "user.name=results-relay", "-c", "user.email=actions@users.noreply.github.com",
-            "commit", "-q", "-m", f"results {bundle['relayedAt']}")
-        git("push", "-q", "--force", f"https://x-access-token:{TOKEN}@github.com/{REPO}.git", "data:data")
-    print(f"{now()} pushed (changedAt {changed_at})")
-    if changed:
-        try:
-            ensure_archive_branch()
-            archive(body, bundle["relayedAt"])
-        except Exception as e:  # never let the archive hold up the live relay
-            print(f"{now()} archive failed: {e!r}")
+    ensure_archive_branch()
+    archive(body, bundle["relayedAt"])
 
 
 def main():
     end = time.time() + DURATION
-    last_hash, last_push, changed_at = None, 0.0, now()
+    last_hash = None
     while time.time() < end:
         for k in FEEDS:
             fetch(k)
         h = content_hash()
         if h != last_hash:
-            changed_at = now()
-        if h != last_hash or time.time() - last_push >= HEARTBEAT:
             try:
-                push(changed_at, changed=h != last_hash)
-                last_hash, last_push = h, time.time()
-            except subprocess.CalledProcessError as e:
-                print(f"{now()} push failed: {e.stderr.decode()[-300:]}")
+                save(now())
+                last_hash = h
+            except Exception as e:  # try again next round
+                print(f"{now()} archive failed: {e!r}")
         time.sleep(INTERVAL)
 
 

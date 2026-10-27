@@ -1,5 +1,6 @@
 // CORS relay for the City of Toronto unofficial results feeds.
-// Only the two feed files are served, and only to the results page's origins.
+// The page polls /live.json: both City files and the news feed in one response, so each open tab makes one
+// request per poll. The two files are also served on their own. Only the results page's origins are allowed.
 // The City asks consumers not to hammer the feed, so each isolate caches for CACHE_MS
 // and serves the last good copy if the City is briefly unreachable.
 //
@@ -10,13 +11,14 @@ import { DurableObject } from 'cloudflare:workers';
 import STATS_HTML from './stats.html';
 import { snapshot, diff, template, checkWriting, signOff } from './feed.js';
 import INCUMBENTS from '../incumbents.json';
+import { ELECTION, FEED_ROOM, VIEWERS_ROOM } from '../election.js';
 
-const UPSTREAM = 'https://mediaresults.toronto.ca/results';
+const UPSTREAM = ELECTION.cityFeed;
 const FILES = new Set(['/unofficialresult.json', '/unofficialresult-wardbyward.json']);
 const ORIGINS = ['https://ndroo.github.io', 'https://torontoelections.andrewmcgrath.info', 'https://toronto-election-site.andrewjohnmcgrath.workers.dev', 'http://localhost:8765'];
 const CACHE_MS = 15000;
 const FLUSH_MS = 10000;
-const LIVE_MS = 90000; // the page polls every 30 s, so a viewer missing for 90 s has left
+const LIVE_MS = 90000; // open pages poll every 30 s (background tabs don't), so a viewer missing for 90 s has left
 const BUCKET_MS = 10 * 60 * 1000;
 const DAY_MS = 24 * 60 * 60 * 1000;
 const SAMPLE_MS = 30000;
@@ -57,7 +59,7 @@ function track(url, env, ctx) {
   const ids = [...pending];
   pending = new Set();
   lastFlush = Date.now();
-  ctx.waitUntil(env.VIEWERS.get(env.VIEWERS.idFromName('all')).record(ids).catch(() => {}));
+  ctx.waitUntil(env.VIEWERS.get(env.VIEWERS.idFromName(VIEWERS_ROOM)).record(ids).catch(() => {}));
 }
 
 // One instance holds every count. SQLite keeps which ids were seen in each 10-minute bucket and the
@@ -193,40 +195,8 @@ async function aiWrite(env, messages) {
   return typeof res?.response === 'string' ? JSON.parse(res.response) : res?.response;
 }
 
-// The Newsroom object holding this election's posts. A new name starts an empty feed (see docs/REVIVE.md).
-const FEED_ROOM = 'feed';
-
-// Live coverage ends here (Toronto time): one sign-off post, then no more posts. The results proxy keeps running.
-const SIGN_OFF = Date.parse('2026-10-27T01:00:00-04:00');
-
-// One-off posts written by hand, added once on the next tick (key keeps them from repeating).
-const NOTICES = [
-  { key: 'notice-extended-voting', kind: 'notice', headline: 'Voting extended at 11 locations, so results may take a little longer',
-    body: 'After earlier disruptions, the City kept 11 voting places open past 8 p.m., the last until 8:20 p.m., in Wards 2, 5, 7, 8, 11, 13 and 16. Results may start arriving later than usual. Details at toronto.ca/elections.' },
-];
-
-// Hand-written posts added by the Worker as it serves /feed.json, so they show up the moment this is deployed
-// (the Newsroom object can take minutes to pick up new code). t is when the post goes up; each slots in after
-// the newest Newsroom post at or before t. beforeResults posts are dropped once results have arrived.
-const EXTRA_POSTS = [
-  { t: Date.parse('2026-10-26T21:01:00-04:00'), kind: 'notice', headline: 'Still waiting on the first results from the City',
-    body: 'The last extended voting place closed at 8:20 p.m., and the City hasn\'t posted any results yet. This page checks for new numbers every 30 seconds, so results will appear here on their own as soon as the City publishes them. No need to refresh.' },
-  { t: Date.parse('2026-10-26T21:12:00-04:00'), kind: 'notice', headline: 'City expected results around 9 p.m.; none posted yet',
-    body: 'In a post at 8:53 p.m., the City of Toronto said some voting places still had voters in line, and that unofficial results would begin to be available at approximately 9 p.m. As of 9:12 p.m. none have been posted. They\'ll appear here as soon as the City publishes them.' },
-];
-function withExtras(posts, now) {
-  const hasResults = posts.some((p) => p.kind !== 'notice' && !['pre-close', 'polls-closed'].includes(p.kind));
-  const heads = new Set(posts.map((p) => p.headline));
-  const picked = EXTRA_POSTS.filter((x) => x.t <= now && !heads.has(x.headline) && !(x.beforeResults && hasResults))
-    .sort((a, b) => a.t - b.t);
-  const after = new Map(); // several extras after the same post get 0.5, 0.51, 0.52... so each id is unique and in order
-  const extra = picked.map((x) => {
-    const base = Math.max(0, ...posts.filter((p) => p.t <= x.t).map((p) => p.id));
-    const k = after.get(base) || 0; after.set(base, k + 1);
-    return { id: base + 0.5 + k / 100, t: x.t, kind: x.kind, headline: x.headline, body: x.body };
-  });
-  return [...posts, ...extra].sort((a, b) => b.id - a.id);
-}
+// Live coverage ends here: one sign-off post, then no more posts. The results proxy keeps running.
+const SIGN_OFF = Date.parse(ELECTION.signOff);
 
 export class Newsroom extends DurableObject {
   constructor(ctx, env) {
@@ -248,7 +218,6 @@ export class Newsroom extends DurableObject {
       const get = async (f) => { const r = await fetch(`${base}/${f}`, { signal: AbortSignal.timeout(10000) }); if (!r.ok) throw new Error(`upstream ${r.status}`); return r.json(); };
       const [all, wbw] = await Promise.all([get('unofficialresult.json'), get('unofficialresult-wardbyward.json')]);
       const now = Date.now();
-      for (const n of NOTICES) if (!(n.beforeResults && (+all.office?.[0]?.ward?.[0]?.pollsReceived || this.get('snap')?.rec))) this.sql.exec('INSERT OR IGNORE INTO posts (key, t, kind, headline, body, ai) VALUES (?, ?, ?, ?, ?, 0)', n.key, now, n.kind, n.headline, n.body);
       const prev = this.get('snap');
       const posted = new Set(this.sql.exec('SELECT key FROM posts').toArray().map((r) => r.key));
       if (posted.has('sign-off')) return { signedOff: true };
@@ -257,7 +226,7 @@ export class Newsroom extends DurableObject {
         this.sql.exec('INSERT OR IGNORE INTO posts (key, t, kind, headline, body, ai) VALUES (?, ?, ?, ?, ?, 0)', e.id, now, e.kind, x.headline, x.body);
         return { signedOff: true };
       }
-      if (prev && prev.seq === String(all.seq || '') && posted.has('polls-closed')) return { unchanged: true, code: 'n2' };
+      if (prev && prev.seq === String(all.seq || '') && posted.has('polls-closed')) return { unchanged: true };
       const cur = snapshot(all, wbw, INCUMBENTS);
       const events = diff(prev, cur, now, posted);
       if (events.length) {
@@ -310,30 +279,77 @@ export class Newsroom extends DurableObject {
   posts() {
     return this.sql.exec('SELECT id, t, kind, headline, body FROM posts ORDER BY id DESC LIMIT 80').toArray();
   }
+
+  // Hand-written posts (scripts/post.sh): news the City's numbers can't show, like extended voting hours.
+  // They go straight into the feed, so posting one never needs a deploy.
+  addPost({ headline, body, kind = 'notice' }) {
+    const key = `hand-${Date.now()}`;
+    this.sql.exec('INSERT INTO posts (key, t, kind, headline, body, ai) VALUES (?, ?, ?, ?, ?, 0)', key, Date.now(), kind, headline, body);
+    return this.sql.exec('SELECT id, t, kind, headline, body FROM posts WHERE key = ?', key).toArray()[0];
+  }
+
+  removePost(id) {
+    this.sql.exec("DELETE FROM posts WHERE id = ? AND key LIKE 'hand-%'", id);
+    return { removed: id };
+  }
 }
 
 // Readers poll this; each isolate keeps the answer for FEED_CACHE_MS so the Durable Object isn't asked per viewer.
 const FEED_CACHE_MS = 15000;
 let feedMemo = null;
+const newsroom = (env) => env.NEWSROOM.get(env.NEWSROOM.idFromName(FEED_ROOM));
 async function feed(env) {
   if (feedMemo && Date.now() - feedMemo.at < FEED_CACHE_MS) return feedMemo.body;
-  const posts = withExtras(await env.NEWSROOM.get(env.NEWSROOM.idFromName(FEED_ROOM)).posts(), Date.now());
+  const posts = await newsroom(env).posts();
   feedMemo = { at: Date.now(), body: JSON.stringify({ at: Date.now(), posts }) };
   return feedMemo.body;
+}
+
+// /live.json: { fetchedAt, all, wardbyward, feed } with the City's files spliced in unchanged. Rebuilt only when
+// one of its parts changes; the ETag lets an unchanged poll come back as an empty 304.
+let liveMemo = null;
+async function live(env) {
+  const [a, w, f] = await Promise.all([
+    load('/unofficialresult.json'), load('/unofficialresult-wardbyward.json'),
+    env.NEWSROOM ? feed(env).catch(() => null) : null,
+  ]);
+  if (!liveMemo || liveMemo.a !== a || liveMemo.w !== w || liveMemo.f !== f) {
+    const fetchedAt = Math.min(a.fetchedAt, w.fetchedAt);
+    let h = 2166136261;
+    for (const part of [a.etag || a.body, w.etag || w.body, f || '']) for (let i = 0; i < part.length; i++) h = Math.imul(h ^ part.charCodeAt(i), 16777619);
+    liveMemo = {
+      a, w, f, fetchedAt, etag: `"${(h >>> 0).toString(16)}"`, stale: a.stale || w.stale,
+      body: `{"fetchedAt":"${new Date(fetchedAt).toISOString()}","all":${a.body},"wardbyward":${w.body},"feed":${f || 'null'}}`,
+    };
+  }
+  return liveMemo;
 }
 
 async function stats(url, env) {
   if (!env.STATS_KEY || !env.VIEWERS || url.searchParams.get('key') !== env.STATS_KEY) return new Response('Not found', { status: 404 });
   if (url.pathname === '/stats') return new Response(STATS_HTML, { headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' } });
-  const body = await env.VIEWERS.get(env.VIEWERS.idFromName('all')).stats();
+  const body = await env.VIEWERS.get(env.VIEWERS.idFromName(VIEWERS_ROOM)).stats();
   return Response.json(body, { headers: { 'Cache-Control': 'no-store' } });
 }
 
 export default {
   async fetch(req, env, ctx) {
     const url = new URL(req.url);
-    if (url.pathname === '/tick' && env.STATS_KEY && url.searchParams.get('key') === env.STATS_KEY) {
-      try { return Response.json(await env.NEWSROOM.get(env.NEWSROOM.idFromName(FEED_ROOM)).tick()); } catch (err) { return Response.json({ error: String(err.message || err) }, { status: 502 }); }
+    const admin = env.STATS_KEY && url.searchParams.get('key') === env.STATS_KEY;
+    // Runs the feed writer once and says what it did.
+    if (url.pathname === '/tick' && admin) {
+      try { return Response.json(await newsroom(env).tick()); } catch (err) { return Response.json({ error: String(err.message || err) }, { status: 502 }); }
+    }
+    // POST {"headline","body"} adds a hand-written post; POST {"delete": <id>} removes one. See scripts/post.sh.
+    if (url.pathname === '/post' && admin && req.method === 'POST') {
+      try {
+        const p = await req.json();
+        if (p.delete != null) return Response.json(await newsroom(env).removePost(+p.delete));
+        if (typeof p.headline !== 'string' || typeof p.body !== 'string' || !p.headline.trim()) return Response.json({ error: 'headline and body required' }, { status: 400 });
+        const post = await newsroom(env).addPost({ headline: p.headline.trim().slice(0, 160), body: p.body.trim().slice(0, 600), kind: p.kind === 'sign-off' ? 'sign-off' : 'notice' });
+        feedMemo = null;
+        return Response.json(post);
+      } catch (err) { return Response.json({ error: String(err.message || err) }, { status: 502 }); }
     }
     if (url.pathname === '/stats' || url.pathname === '/stats.json') {
       try { return await stats(url, env); } catch (err) { return Response.json({ error: String(err.message || err) }, { status: 502 }); }
@@ -349,6 +365,18 @@ export default {
     if (url.pathname === '/feed.json' && env.NEWSROOM) {
       try { return new Response(await feed(env), { headers: { ...cors, 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-cache' } }); }
       catch (err) { return new Response(JSON.stringify({ error: String(err.message || err) }), { status: 502, headers: { ...cors, 'Content-Type': 'application/json' } }); }
+    }
+    if (url.pathname === '/live.json') {
+      track(url, env, ctx);
+      try {
+        const l = await live(env);
+        const headers = { ...cors, 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-cache', ETag: l.etag, 'X-Fetched-At': new Date(l.fetchedAt).toISOString() };
+        if (l.stale) headers['X-Stale'] = l.stale;
+        if (req.headers.get('If-None-Match') === l.etag) return new Response(null, { status: 304, headers });
+        return new Response(l.body, { headers });
+      } catch (err) {
+        return new Response(JSON.stringify({ error: String(err.message || err) }), { status: 502, headers: { ...cors, 'Content-Type': 'application/json' } });
+      }
     }
     if (!FILES.has(url.pathname)) return new Response('Not found', { status: 404, headers: cors });
     track(url, env, ctx);
@@ -371,6 +399,6 @@ export default {
     }
   },
   async scheduled(controller, env, ctx) {
-    if (env.NEWSROOM) ctx.waitUntil(env.NEWSROOM.get(env.NEWSROOM.idFromName(FEED_ROOM)).tick().then((r) => console.log('feed tick', JSON.stringify(r))));
+    if (env.NEWSROOM) ctx.waitUntil(newsroom(env).tick().then((r) => console.log('feed tick', JSON.stringify(r))));
   },
 };

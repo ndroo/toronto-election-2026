@@ -1,7 +1,7 @@
-name: Relay results feed
+name: Archive results feed
 
-# The City's feed blocks cross-origin browser requests, so this job copies it
-# into the `data` branch, which the static page reads through the GitHub API.
+# Saves every version of the City's feed on election night to the `archive` branch (scripts/relay.py), for
+# ?replay and testing. The page doesn't depend on it. Dates are UTC; `npm run preflight` checks them.
 on:
   workflow_dispatch:
   schedule:

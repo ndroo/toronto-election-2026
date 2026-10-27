@@ -2,40 +2,59 @@
 
 Live at **https://torontoelections.andrewmcgrath.info/** (the old GitHub Pages address redirects there).
 
-**Archive mode since October 27, 2026:** the page shows the final unofficial results from `final/` as static files and needs no Worker. To run it for another election, see [docs/REVIVE.md](docs/REVIVE.md).
-
-Static page showing live unofficial results for mayor, council and school trustees, from the City of Toronto media feeds:
+A free, ad-free page for following Toronto's municipal election on the night: a ward-by-ward map, race calls for
+mayor, council and school trustees, follow links for any candidate, and a live news feed written as the count
+came in. Results come straight from the City of Toronto's unofficial results feeds:
 
 - https://mediaresults.toronto.ca/results/unofficialresult.json
 - https://mediaresults.toronto.ca/results/unofficialresult-wardbyward.json
 
-## How data gets to the browser
+**Archive mode since October 27, 2026:** the page shows the final unofficial results from `final/` as static files
+and needs no Worker. `?replay` plays election night back from the City's own updates. To run it for another
+election, see [docs/REVIVE.md](docs/REVIVE.md).
 
-The City's feed does not allow cross-origin browser requests, so a GitHub Actions workflow (`.github/workflows/relay.yml`, `scripts/relay.py`) polls it every ~45 seconds and force-pushes the raw feed JSON, unchanged, as `bundle.json` on the `data` branch. The page reads that through the GitHub contents API (falling back to raw.githubusercontent.com, which can lag ~5 min, if the API rate limit is hit). No server to run.
+## How it fits together
 
-The relay runs on a cron for Oct 26-28. To kick it manually: `gh workflow run relay.yml`.
+| Piece | Where | What it does |
+|---|---|---|
+| `election.js` | page and Workers | Everything that changes per election: dates, archive switch, URLs, race-call thresholds |
+| `index.html`, `app.js` | static site | The page. No framework, no build step beyond copying files |
+| `worker/` | Cloudflare Worker `toronto-election-2026` | `/live.json`: both City files and the news feed in one cached, CORS-enabled response. Counts anonymous viewers (`Viewers` Durable Object) and writes the feed (`Newsroom` Durable Object, on a one-minute cron) |
+| `worker/feed.js` | Worker and page | Race calls, feed events and their templates, and the check every AI-written post must pass. The page uses the same race-call code, so the two never disagree |
+| `site/` | Cloudflare Worker `toronto-election-site` | Serves `dist/` as static assets; gives `?watch=` follow links their own link preview |
+| `scripts/relay.py` | GitHub Actions | Saves every version of the City's feed to the `archive` branch on election night |
 
-## Useful URLs
+Each open tab makes one request every 30 seconds while it's visible, and none in the background.
 
-- `?demo` - random numbers on the real candidate lists, to preview the layout (red banner)
-- `#w=10&m=council` - pin ward 10, colour map by council margin (`mayor`, `council`, `reporting`, `turnout`)
-- `#w=10&watch=ian-cunningham` - open ward 10 and add that candidate to the watch list (names match loosely)
-- `?src=<url>` - read a bundle from another URL (local testing)
+## Running it locally
+
+Node 22 or newer.
+
+```sh
+npm install           # puppeteer-core, for the browser tests
+npm run serve         # http://localhost:8765/
+npm test              # unit tests, then the browser tests (needs Google Chrome)
+npm run preflight     # checks the repo agrees with election.js
+```
+
+Useful URLs:
+
+- `?demo`: a simulated count on the real candidate lists (red banner). `?demo&preview=thanks` and `?demo&preview=about` open the end-of-night cards
+- `?replay`: election night as it happened, from the saved versions in `replay/` (`scripts/replay-pack.py`)
+- `?worker=http://localhost:8787`: read a local `wrangler dev` Worker, even in archive mode
+- `#w=10&m=council`: pin ward 10, colour the map by council margin (`mayor`, `support`, `council`, `reporting`, `turnout`)
+- `?w=10&watch=ian-cunningham`: open ward 10 and follow that candidate (names match loosely)
+- `?src=<url>`: read a bundle `{ all, wardbyward }` from another URL
+
+## Deploying
+
+```sh
+scripts/build-site.sh && (cd site && npx wrangler@4 deploy)   # the page
+(cd worker && npx wrangler@4 deploy)                          # the results Worker
+```
+
+The build tags `app.js` with a hash of the code and writes it to `version.txt`; open pages reload themselves within
+two minutes of a new version. `scripts/post.sh "Headline" "Body"` adds a hand-written post to the live feed with no
+deploy.
 
 Ward boundaries: Toronto Open Data, City Wards (25-ward model), simplified.
-
-## Cloudflare Worker (primary data path)
-
-`worker/` is a Cloudflare Worker that passes the two City files through with a CORS header for the GitHub Pages origin (and localhost:8765), caching each for 15 s and serving the last good copy if the City is briefly unreachable. Deploy with `cd worker && npx wrangler@4 deploy` (Node 22+). The page uses it first and falls back to the GitHub Actions copy if it fails. Override with `?worker=<base url>`.
-
-## Hosting the page
-
-The static site is served by a Cloudflare Worker with static assets (`site/`), on the custom domain
-torontoelections.andrewmcgrath.info. To publish a change: `scripts/build-site.sh && (cd site && npx wrangler@4 deploy)`
-(Node 22+). Bump the `app.js?v=` tag in index.html with each change so browsers don't mix old and new files.
-The `gh-pages` branch holds only a redirect page for the old ndroo.github.io address.
-
-## Archive
-
-Every version of the City's feed seen on election night is kept on the `archive` branch
-(`archive/<election>/<UTC time>.json.gz`), for replays and future demos.

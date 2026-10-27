@@ -1,21 +1,24 @@
 // Live feed: turns two consecutive copies of the City's results feed into news-style posts.
-// Used by the Worker (the one writer everyone reads from) and by the page in ?demo mode (templates only).
+// Used by the Worker (the one writer everyone reads from) and by the page, which also takes its race calls
+// from assessRace() here, so the feed and the page can never disagree.
 // Pure functions only: no fetch, no storage, no Worker APIs.
+import { ELECTION, CALL } from '../election.js';
 
-// Must match CALL and callRace in app.js so the feed never calls a race the page doesn't.
-export const CALL = { minReporting: 0.25, safety: 1.5, needShare: 0.75, swing: 0.30 };
+export { CALL };
 export const CALLED = new Set(['projected', 'decided']);
-export const POLLS_CLOSE = Date.parse('2026-10-26T20:00:00-04:00');
+export const POLLS_CLOSE = Date.parse(ELECTION.pollsClose);
+// "8 p.m.", for the feed's and the page's wording.
+export const CLOSE_TIME = new Date(POLLS_CLOSE).toLocaleTimeString('en-CA', { timeZone: 'America/Toronto', hour: 'numeric', minute: '2-digit' }).replace(':00', '');
 const BOARD_SHORT = { 'Toronto District School Board': 'TDSB', 'Toronto Catholic District School Board': 'TCDSB', 'Conseil scolaire Viamonde': 'Viamonde', 'Conseil scolaire catholique MonAvenir': 'MonAvenir' };
 const MILESTONES = [0.25, 0.5, 0.75, 0.9, 1];
-// Before polls close: a short post on each of these (Toronto time), so the feed isn't silent all day.
-const PRE_CLOSE = ['2026-10-26T16:00:00-04:00', '2026-10-26T17:00:00-04:00', '2026-10-26T18:00:00-04:00', '2026-10-26T19:00:00-04:00', '2026-10-26T19:30:00-04:00'].map(Date.parse);
+// Before polls close: a short post on each of these, so the feed isn't silent all day.
+const PRE_CLOSE = ELECTION.preClose.map(Date.parse);
 
 const int = (v) => { const n = parseInt(String(v ?? '').replace(/,/g, ''), 10); return Number.isFinite(n) ? n : 0; };
 const fmt = (n) => Math.round(n).toLocaleString('en-CA');
 const pct1 = (n) => `${n.toFixed(1)}%`;
 
-// ---------- model (same rules as race() / buildModel() / callRace() in app.js) ----------
+// ---------- model (same rules as race() / buildModel() in app.js) ----------
 function race(w, cands, pctFrom) {
   const list = cands.map((c) => ({ name: c.name.trim(), votes: int(c.votesReceived) }));
   const sum = list.reduce((a, c) => a + c.votes, 0);
@@ -29,23 +32,28 @@ function race(w, cands, pctFrom) {
   return r;
 }
 
-export function callRace(r, estLeft) {
-  if (!r || !r.cands.length) return 'none';
+// The race-call rule. r: { polls, rec, votes, ballots?, totalVoters, cands (most votes first), leader, tied, complete }.
+// estLeft: votes still to come, when the caller has a better estimate than this race's own average per poll.
+// Returns the status plus the figures behind it; the page turns those into its plain-English reasons.
+export function assessRace(r, estLeft) {
+  if (!r || !r.cands.length) return { status: 'none' };
   const [a, b] = r.cands;
-  if (!b) return 'acclaimed';
-  if (!r.leader || !r.rec) return 'awaiting';
-  if (r.tied) return 'tied';
-  if (r.complete) return 'decided';
+  if (!b) return { status: 'acclaimed' };
+  if (!r.leader || !r.rec) return { status: 'awaiting' };
+  if (r.tied) return { status: 'tied' };
+  if (r.complete) return { status: 'decided' };
   const gap = a.votes - b.votes;
   const maxLeft = Math.max(0, r.totalVoters - (r.ballots ?? r.votes));
-  if (gap > maxLeft) return 'decided';
+  if (gap > maxLeft) return { status: 'decided', gap, maxLeft };
   const left = Math.min(maxLeft, (estLeft ?? (r.votes / r.rec) * (r.polls - r.rec)) * CALL.safety);
   const topTwo = r.votes ? left * ((a.votes + b.votes) / r.votes) : 0;
   const need = topTwo > 0 ? (topTwo + gap) / (2 * topTwo) : Infinity;
-  const hasNow = b.votes / (a.votes + b.votes);
-  if (r.rec / r.polls < CALL.minReporting) return 'early';
-  return need >= CALL.needShare || need - hasNow >= CALL.swing ? 'projected' : 'close';
+  const hasNow = b.votes / (a.votes + b.votes); // runner-up's share of the top-two vote so far
+  const rep = r.rec / r.polls;
+  if (rep < CALL.minReporting) return { status: 'early', need, rep };
+  return { status: need >= CALL.needShare || need - hasNow >= CALL.swing ? 'projected' : 'close', need, hasNow, topTwo };
 }
+export const callRace = (r, estLeft) => assessRace(r, estLeft).status;
 
 // Compact snapshot of every race: what the diff needs, small enough to store between runs.
 // `inc` is incumbents.json: who held each mayor/council seat going in, and whether they're on the ballot.
@@ -125,7 +133,7 @@ export function diff(prev, cur, now, posted = new Set()) {
   const ev = [];
   cur.lc = { ...(prev?.lc || {}) }; // when each race last had a lead-change post
   const add = (e) => { if (!posted.has(e.id)) { ev.push(e); posted.add(e.id); } };
-  if (now >= POLLS_CLOSE) add({ id: 'polls-closed', kind: 'polls-closed', facts: { closedAt: '8 p.m.' } });
+  if (now >= POLLS_CLOSE) add({ id: 'polls-closed', kind: 'polls-closed', facts: { closedAt: CLOSE_TIME } });
   // Only the latest pre-close mark that has passed, so a late start doesn't post a backlog.
   const mark = now < POLLS_CLOSE ? PRE_CLOSE.filter((t) => t <= now).pop() : null;
   if (mark && cur) {
@@ -192,11 +200,11 @@ export function template(e) {
       const lines = [
         `${fmt(f.electors)} people are on the voters' list, choosing a mayor from ${f.mayorCandidates} candidates.`,
         `${f.councilCandidates} candidates are running for council across ${f.wards} wards, plus ${f.trusteeRaces} school trustee races.`,
-        'Results will start appearing here after 8 p.m., ward by ward, as the City reports them.',
+        `Results will start appearing here after ${CLOSE_TIME}, ward by ward, as the City reports them.`,
         `There are ${f.mayorCandidates} names on the ballot for mayor, and ${f.councilCandidates} running for council.`,
         'Once polls close, updates will appear here as the City reports results.',
       ];
-      return { headline: `${left} until polls close`, body: `Voting is open until 8 p.m. ${lines[Math.round(4 - h) % lines.length] || lines[4]}` };
+      return { headline: `${left} until polls close`, body: `Voting is open until ${CLOSE_TIME}. ${lines[Math.round(4 - h) % lines.length] || lines[4]}` };
     }
     case 'sign-off': {
       const m = f.mayor, Lm = m.leader;
@@ -207,7 +215,7 @@ export function template(e) {
       return { headline: 'That\'s it for live coverage tonight', body: `${fmt(f.pollsIn)} of ${fmt(f.polls)} polls have reported. ${mayor} ${f.councilCalled} of ${f.councilRaces} council races have a winner or projected winner. The results on this page keep updating from the City's feed. Thanks for following along.` };
     }
     case 'polls-closed': return pick(e.id, [
-      { headline: 'Polls are closed across Toronto', body: 'Voting ended at 8 p.m. The first unofficial results should start arriving from the City shortly.' },
+      { headline: 'Polls are closed across Toronto', body: `Voting ended at ${f.closedAt}. The first unofficial results should start arriving from the City shortly.` },
     ]);
     case 'first-results': {
       const m = f.mayor;

@@ -1,6 +1,7 @@
 // The site is static files; this only runs for the main page (see run_worker_first), so a follow link like
 // "/?w=10&watch=ian-cunningham" gets its own link preview: who's being followed, their race, and their card.
 import CARDS from './cards.json';
+import { ELECTION } from '../election.js';
 
 const SITE = 'https://torontoelections.andrewmcgrath.info';
 // Same as the page's slug(): case, accents and punctuation don't matter.
@@ -21,7 +22,7 @@ export default {
     const w = url.searchParams.get('w');
     const c = findCard(w && /^\d{1,2}$/.test(w) ? w : null, want);
     if (!c) return res;
-    const title = `Follow ${c.name} · ${c.short} · Toronto 2026 election results`;
+    const title = `Follow ${c.name} · ${c.short} · ${ELECTION.title}`;
     const desc = `Live, unofficial results for ${c.name}${c.tag ? ` (${c.tag})` : ''}, ${c.race}: votes, place and the gap to the leader as polls report. Ad-free, from the City of Toronto's results feed.`;
     const link = `${SITE}/?${w ? `w=${w}&` : ''}watch=${want}`;
     const image = `${SITE}/${c.image}`;

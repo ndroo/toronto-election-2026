@@ -1,0 +1,18 @@
+{
+  "name": "toronto-election-2026",
+  "private": true,
+  "type": "module",
+  "description": "Live municipal election results for Toronto. Static page plus two Cloudflare Workers.",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "serve": "node tests/serve.mjs",
+    "test": "node --test tests/unit/*.test.mjs && node tests/browser.mjs",
+    "test:unit": "node --test tests/unit/*.test.mjs",
+    "test:browser": "node tests/browser.mjs",
+    "preflight": "node scripts/preflight.mjs",
+    "build": "scripts/build-site.sh"
+  },
+  "devDependencies": {
+    "puppeteer-core": "^23.11.1"
+  }
+}
