@@ -818,10 +818,17 @@
           <div class="scroller"><ul class="cands">${candList(w.mayor, { colour: true, showCall: false })}</ul></div></div>
       </div>`;
     el.querySelectorAll('.scroller').forEach((x, i) => { if (keep[i]) x.scrollTop = keep[i]; });
-    // Both summaries take the taller one's height so the two candidate lists start on the same line.
+    alignSums();
+  }
+  // Both summaries take the taller one's height so the two candidate lists start on the same line.
+  // A hidden panel measures 0, so this waits until the ward tab is showing (setTab calls it again).
+  function alignSums() {
+    const el = $('#panel-ward');
+    if (el.hidden) return;
     const sums = [...el.querySelectorAll('.race-sum')];
+    sums.forEach((x) => { x.style.height = ''; });
     const h = Math.max(...sums.map((x) => x.scrollHeight));
-    sums.forEach((x) => { x.style.height = `${h}px`; });
+    if (h > 0) sums.forEach((x) => { x.style.height = `${h}px`; });
   }
 
   // Same shape as the council summary, so both columns line up, but scoped to this ward and never a call.
@@ -1243,6 +1250,7 @@
     if (t === 'feed') renderFeed();
     for (const b of document.querySelectorAll('.tabs button')) b.setAttribute('aria-selected', String(b.dataset.tab === t && (t !== 'ward' || b.dataset.w === pinned)));
     for (const p of document.querySelectorAll('#right .panel')) p.hidden = p.id !== `panel-${t}`;
+    if (t === 'ward') alignSums();
     saveHash();
   }
   $('.tabs').addEventListener('click', (e) => {

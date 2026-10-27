@@ -297,6 +297,9 @@ async function stats(url, env) {
 export default {
   async fetch(req, env, ctx) {
     const url = new URL(req.url);
+    if (url.pathname === '/tick' && env.STATS_KEY && url.searchParams.get('key') === env.STATS_KEY) {
+      try { return Response.json(await env.NEWSROOM.get(env.NEWSROOM.idFromName('feed')).tick()); } catch (err) { return Response.json({ error: String(err.message || err) }, { status: 502 }); }
+    }
     if (url.pathname === '/stats' || url.pathname === '/stats.json') {
       try { return await stats(url, env); } catch (err) { return Response.json({ error: String(err.message || err) }, { status: 502 }); }
     }
