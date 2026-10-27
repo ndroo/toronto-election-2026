@@ -515,6 +515,76 @@
   const wardSize = {};
   let faceLayer, meLayer;
   let hl, pin;
+  // ---------- map zoom ----------
+  // Buttons, pinch, ctrl/⌘ + wheel (also trackpad pinch) and drag-to-pan once zoomed. Only the viewBox changes.
+  const zoom = { k: 1, x: 0, y: 0 };
+  const ZOOM_MAX = 6;
+  let dragged = false;
+  function applyZoom() {
+    const w = geo.w / zoom.k, h = geo.h / zoom.k;
+    zoom.x = clamp(zoom.x, 0, geo.w - w); zoom.y = clamp(zoom.y, 0, geo.h - h);
+    svg.setAttribute('viewBox', `${zoom.x} ${zoom.y} ${w} ${h}`);
+    svg.classList.toggle('zoomed', zoom.k > 1.001);
+    $('#zoomOut').disabled = zoom.k <= 1.001; $('#zoomIn').disabled = zoom.k >= ZOOM_MAX - 0.001;
+    $('#zoomReset').hidden = zoom.k <= 1.001;
+  }
+  function toMap(cx, cy) { const p = svg.createSVGPoint(); p.x = cx; p.y = cy; return p.matrixTransform(svg.getScreenCTM().inverse()); }
+  // Zoom to k keeping the map point (px, py) where it is on screen.
+  function zoomAt(k, px, py) {
+    k = clamp(k, 1, ZOOM_MAX);
+    const w = geo.w / zoom.k, h = geo.h / zoom.k, fx = (px - zoom.x) / w, fy = (py - zoom.y) / h;
+    zoom.k = k; zoom.x = px - fx * (geo.w / k); zoom.y = py - fy * (geo.h / k);
+    applyZoom();
+  }
+  const zoomCentre = (f) => zoomAt(zoom.k * f, zoom.x + geo.w / zoom.k / 2, zoom.y + geo.h / zoom.k / 2);
+  function initZoom() {
+    $('#zoomIn').addEventListener('click', () => zoomCentre(1.6));
+    $('#zoomOut').addEventListener('click', () => zoomCentre(1 / 1.6));
+    $('#zoomReset').addEventListener('click', () => { zoom.k = 1; applyZoom(); });
+    svg.addEventListener('wheel', (e) => {
+      if (!e.ctrlKey && !e.metaKey) return; // a plain wheel still scrolls the page
+      e.preventDefault();
+      const p = toMap(e.clientX, e.clientY);
+      zoomAt(zoom.k * Math.exp(-e.deltaY * (e.deltaMode ? 0.05 : 0.01)), p.x, p.y);
+    }, { passive: false });
+    const pts = new Map();
+    let last = null; // previous single-pointer position, or { mid, dist } while pinching
+    let moved = 0;
+    const pinch = () => { const [a, b] = [...pts.values()]; return { mid: { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }, dist: Math.hypot(a.x - b.x, a.y - b.y) || 1 }; };
+    svg.addEventListener('pointerdown', (e) => {
+      if (e.button) return;
+      pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      moved = 0; dragged = false;
+      last = pts.size === 2 ? pinch() : { x: e.clientX, y: e.clientY };
+    });
+    svg.addEventListener('pointermove', (e) => {
+      if (!pts.has(e.pointerId)) return;
+      pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (pts.size === 2) {
+        const now = pinch();
+        if (!last?.dist) { last = now; return; }
+        const p = toMap(now.mid.x, now.mid.y);
+        zoomAt(zoom.k * (now.dist / last.dist), p.x, p.y);
+        const a = toMap(last.mid.x, last.mid.y), b = toMap(now.mid.x, now.mid.y);
+        zoom.x += a.x - b.x; zoom.y += a.y - b.y; applyZoom();
+        last = now; dragged = true;
+        return;
+      }
+      if (pts.size !== 1 || zoom.k <= 1.001 || !last || last.dist) return;
+      moved += Math.abs(e.clientX - last.x) + Math.abs(e.clientY - last.y);
+      if (moved < 6) return; // small jitters are still clicks
+      if (!dragged) { dragged = true; try { svg.setPointerCapture(e.pointerId); } catch {} }
+      const a = toMap(last.x, last.y), b = toMap(e.clientX, e.clientY);
+      zoom.x += a.x - b.x; zoom.y += a.y - b.y; applyZoom();
+      last = { x: e.clientX, y: e.clientY };
+      setHover(null);
+    });
+    const up = (e) => { pts.delete(e.pointerId); last = pts.size === 1 ? { ...[...pts.values()][0] } : null; };
+    svg.addEventListener('pointerup', up);
+    svg.addEventListener('pointercancel', up);
+    applyZoom();
+  }
+
   function buildMap() {
     svg.setAttribute('viewBox', `0 0 ${geo.w} ${geo.h}`);
     const gW = document.createElementNS(NS, 'g');
@@ -553,7 +623,8 @@
       if (n) { setHover(n); placeTip(e.clientX, e.clientY); } else setHover(null);
     });
     svg.addEventListener('pointerleave', () => setHover(null));
-    svg.addEventListener('click', (e) => { const n = e.target.dataset?.w; if (n) { setPinned(n, true); setTab('ward'); } });
+    svg.addEventListener('click', (e) => { if (dragged) { dragged = false; return; } const n = e.target.dataset?.w; if (n) { setPinned(n, true); setTab('ward'); } });
+    initZoom();
     svg.addEventListener('focusin', (e) => { const n = e.target.dataset?.w; if (n) { setHover(n); const r = e.target.getBoundingClientRect(); placeTip(r.right, r.top); } });
     svg.addEventListener('focusout', () => setHover(null));
     svg.addEventListener('keydown', (e) => { const n = e.target.dataset?.w; if (n && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); setPinned(n); setTab('ward'); } });
