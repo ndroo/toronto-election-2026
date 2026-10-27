@@ -41,12 +41,14 @@
   --critical: #d03b3b;
   --warn-bg: #fff4d6;
   --demo: #d03b3b;
+  --tcc-bg: #0a0a0d; --tcc-line: transparent; --tcc-ink: #f3f1ec; --tcc-tag: #b9b7c4; --tcc-pitch: #d6d4dc; --tcc-kicker: #ff8a7d; --tcc-glow: rgba(255,77,61,.28);
   --seq: #cde2fb,#b7d3f6,#9ec5f4,#86b6ef,#6da7ec,#5598e7,#3987e5,#2a78d6,#256abf,#1c5cab,#184f95,#104281,#0d366b;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     color-scheme: dark;
     --page: #0d0d0d; --surface: #1a1a19; --surface-2: #232321;
+    --tcc-bg: #0a0a0d; --tcc-line: transparent; --tcc-ink: #f3f1ec; --tcc-tag: #b9b7c4; --tcc-pitch: #d6d4dc; --tcc-kicker: #ff8a7d; --tcc-glow: rgba(255,77,61,.28);
     --ink: #f0efec; --ink-2: #c3c2b7; --muted: #898781;
     --grid: #2c2c2a; --axis: #383835; --border: rgba(255,255,255,0.10);
     --s1: #3987e5; --s2: #d95926; --s3: #199e70;
@@ -58,6 +60,7 @@
 :root[data-theme="dark"] {
   color-scheme: dark;
   --page: #0d0d0d; --surface: #1a1a19; --surface-2: #232321;
+  --tcc-bg: #0a0a0d; --tcc-line: transparent; --tcc-ink: #f3f1ec; --tcc-tag: #b9b7c4; --tcc-pitch: #d6d4dc; --tcc-kicker: #ff8a7d; --tcc-glow: rgba(255,77,61,.28);
   --ink: #f0efec; --ink-2: #c3c2b7; --muted: #898781;
   --grid: #2c2c2a; --axis: #383835; --border: rgba(255,255,255,0.10);
   --s1: #3987e5; --s2: #d95926; --s3: #199e70;
@@ -486,6 +489,34 @@ svg#map .me-halo { fill: var(--proj); opacity: .25; transform-box: fill-box; tra
 @keyframes dlg-in { from { opacity: 0; transform: translateY(10px) scale(.98); } }
 @keyframes bd-in { from { opacity: 0; } }
 
+/* Thank-you card after the mayor's race is called */
+#thanks { border: 1px solid var(--border); border-radius: 16px; padding: 0; width: min(460px, calc(100vw - 32px)); max-height: calc(100dvh - 24px); overflow-y: auto; background: var(--surface); color: var(--ink); box-shadow: 0 24px 64px rgba(0,0,0,.3); }
+#thanks::backdrop { background: rgba(0,0,0,.4); backdrop-filter: blur(2px); }
+.thanks-result { display: flex; align-items: center; gap: 14px; padding: 20px 22px 16px; border-bottom: 1px solid var(--grid); background: linear-gradient(180deg, rgba(226,178,58,.14), transparent); }
+.thanks-result .av { width: 56px; height: 56px; flex: none; }
+.thanks-kicker { font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: #b58612; }
+.thanks-head { font-size: 17px; line-height: 1.3; margin-top: 2px; }
+.thanks-sub { font-size: 12.5px; color: var(--muted); margin-top: 3px; }
+.thanks-body { padding: 16px 22px 4px; }
+.thanks-body h2 { margin: 0 0 6px; font-size: 19px; letter-spacing: -0.01em; }
+.thanks-body p { margin: 0; color: var(--ink-2); line-height: 1.5; font-size: 14px; }
+.tcc { display: flex; gap: 14px; align-items: flex-start; margin: 14px 22px 4px; padding: 14px; border-radius: 14px; background: var(--tcc-bg); border: 1px solid var(--tcc-line); color: var(--tcc-ink) !important; text-decoration: none; background-image: radial-gradient(circle at 0 0, var(--tcc-glow), transparent 60%); }
+.tcc:hover { filter: brightness(1.12); }
+.tcc-logo svg { width: 56px; height: 56px; display: block; flex: none; }
+.tcc-text { display: flex; flex-direction: column; min-width: 0; }
+.tcc-kicker { font-size: 10.5px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; color: var(--tcc-kicker); }
+.tcc b { font-size: 21px; letter-spacing: -0.02em; line-height: 1.15; }
+.tcc-tag { font-size: 13px; color: var(--tcc-tag); font-weight: 600; }
+.tcc-pitch { font-size: 12.5px; line-height: 1.45; color: var(--tcc-pitch); margin-top: 6px; }
+.thanks-foot { display: flex; justify-content: flex-end; gap: 8px; padding: 14px 22px 18px; flex-wrap: wrap; }
+.thanks-body h2:focus { outline: none; }
+.thanks-foot { align-items: center; }
+.thanks-close { border: 0; background: none; color: var(--ink-2); font: 600 14px/1 system-ui, -apple-system, "Segoe UI", sans-serif; padding: 10px 12px; cursor: pointer; border-radius: 8px; }
+.thanks-close:hover { color: var(--ink); background: var(--surface-2); }
+.thanks-close:focus-visible, .tcc-btn:focus-visible, .tcc:focus-visible { outline: 2px solid #ff4d3d; outline-offset: 2px; }
+.btn.tcc-btn { background: #d8321f !important; border-color: #d8321f !important; color: #fff !important; }
+.btn.tcc-btn:hover { background: #c92a1c !important; filter: none; }
+@media (max-width: 420px) { .thanks-result, .thanks-body { padding-left: 16px; padding-right: 16px; } .tcc { margin-left: 16px; margin-right: 16px; } .thanks-foot { padding: 12px 16px 14px; } .thanks-foot .btn { flex: 1; text-align: center; } .thanks-close { flex: none; } }
 /* Welcome dialog */
 #welcome { border: 1px solid var(--border); border-radius: 14px; padding: 0; width: min(520px, calc(100vw - 32px)); background: var(--surface); color: var(--ink); box-shadow: 0 24px 64px rgba(0,0,0,.3); }
 #welcome::backdrop { background: rgba(0,0,0,.35); backdrop-filter: blur(2px); }
@@ -796,6 +827,25 @@ body.watching .toast { bottom: 120px; }
   <span>Official: <a href="https://www.toronto.ca/city-government/elections/">toronto.ca/elections</a></span>
 </footer>
 
+<dialog id="thanks" class="fade-dlg" aria-labelledby="thanksTitle">
+  <form method="dialog">
+    <div class="thanks-result" id="thanksResult"></div>
+    <div class="thanks-body">
+      <h2 id="thanksTitle" tabindex="-1" autofocus>Thanks for following along</h2>
+      <p>I built this page as a side project so Toronto could watch tonight's results somewhere fast and ad-free. Thank you for visiting, and for sharing it. The results here will keep updating until the count is done.</p>
+    </div>
+    <a class="tcc" href="https://triplec.fm/?ref=torontoelections" target="_blank" rel="noopener">
+      <span class="tcc-logo"><svg viewBox="0 0 512 512" aria-hidden="true"><rect width="512" height="512" rx="112" fill="#ff4d3d"/><g transform="translate(256 256) scale(0.8) translate(-256 -256)"><g fill="none" stroke="#fff" stroke-width="34" stroke-linecap="round"><path d="M353.6 192.4 A90 90 0 1 0 353.6 319.6"/><path d="M394.7 151.3 A148 148 0 1 0 394.7 360.7"/><path d="M435.7 110.3 A206 206 0 1 0 435.7 401.7"/></g><path fill="#fff" transform="translate(296 254) scale(0.03700) translate(-4800 -2330)" d="M4890 4430l-45-863a95 95 0 0 1 111-98l859 151-116-320a65 65 0 0 1 20-73l941-762-212-99a65 65 0 0 1-34-79l186-572-542 115a65 65 0 0 1-73-38l-105-247-423 454a65 65 0 0 1-111-57l204-1052-327 189a65 65 0 0 1-91-27l-332-652-332 652a65 65 0 0 1-91 27l-327-189 204 1052a65 65 0 0 1-111 57l-423-454-105 247a65 65 0 0 1-73 38l-542-115 186 572a65 65 0 0 1-34 79l-212 99 941 762a65 65 0 0 1 20 73l-116 320 859-151a95 95 0 0 1 111 98l-45 863z"/></g></svg></span>
+      <span class="tcc-text"><span class="tcc-kicker">My next project</span><b>Triple C</b><span class="tcc-tag">Champions of new Canadian music</span>
+        <span class="tcc-pitch">A not-for-profit radio station for new Canadian music, plus a gig guide to shows across the country. Artists can send in their music.</span></span>
+    </a>
+    <div class="thanks-foot">
+      <button class="thanks-close" value="close">Back to results</button>
+      <a class="btn tcc-btn" href="https://triplec.fm/?ref=torontoelections" target="_blank" rel="noopener">Visit triplec.fm</a>
+    </div>
+  </form>
+</dialog>
+
 <dialog id="welcome" class="fade-dlg" aria-labelledby="welcomeTitle">
   <form method="dialog">
    <div class="welcome-body">
@@ -845,6 +895,6 @@ body.watching .toast { bottom: 120px; }
 
 <div id="tip" role="tooltip"></div>
 <div id="callTip" role="tooltip"></div>
-<script src="app.js?v=20261026-fl8"></script>
+<script src="app.js?v=20261026-fl10"></script>
 </body>
 </html>

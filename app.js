@@ -1508,6 +1508,26 @@
       store.set('mayorCelebrated', m.leader.name);
       celebrateMayor(m.leader.name, st);
     }
+    // Once the mayor's race is called: one thank-you card per browser, after the celebration has played.
+    if (m?.leader && !m.tied && CALLED.has(st) && st !== 'acclaimed' && store.get('thanksShown') !== m.leader.name && !thanksTimer) {
+      thanksTimer = setTimeout(function tryThanks() {
+        if (document.hidden || document.querySelector('dialog[open]')) { thanksTimer = setTimeout(tryThanks, 3000); return; }
+        showThanks();
+      }, 6000);
+    }
+  }
+  let thanksTimer = null;
+  function showThanks() {
+    const m = model?.mayor, L = m?.leader;
+    if (!L) return;
+    const st = m.call?.status;
+    store.set('thanksShown', L.name);
+    const verb = st === 'official' ? 'wins' : st === 'decided' ? 'finishes first in' : 'is the projected winner of';
+    $('#thanksResult').innerHTML = `${avatar('mayor', L.name, candColour(L.name))}
+      <div><div class="thanks-kicker">${st === 'official' ? 'Official result' : 'Unofficial result'}</div>
+      <div class="thanks-head"><b>${esc(L.name)}</b> ${verb} the race for mayor</div>
+      <div class="thanks-sub">${pct(L.pct)} of the vote, with ${fmt(m.pollsReceived)} of ${fmt(m.polls)} polls reporting</div></div>`;
+    $('#thanks').showModal();
   }
   function wardConfetti(n) {
     if (reduceMotion.matches || document.hidden || !geo.wards[n]) return;
@@ -1843,6 +1863,7 @@
     setInterval(tick, POLL_MS);
     setInterval(() => holdScroll(renderStatus), 1000);
     setTimeout(maybeWelcome, 4000); // still greet people if the first load is slow or fails
+    if (DEMO && params.get('preview') === 'thanks') setTimeout(() => { document.querySelectorAll('dialog[open]').forEach((d) => d.close()); showThanks(); }, 2500);
     document.addEventListener('visibilitychange', () => { if (!document.hidden) { tick(); checkVersion(); } });
     setInterval(checkVersion, 120000);
   });
