@@ -206,9 +206,9 @@ const NOTICES = [
 // (the Newsroom object can take minutes to pick up new code). t is when the post goes up; each slots in after
 // the newest Newsroom post at or before t. beforeResults posts are dropped once results have arrived.
 const EXTRA_POSTS = [
-  { t: Date.parse('2026-10-26T21:01:00-04:00'), kind: 'notice', beforeResults: true, headline: 'Still waiting on the first results from the City',
+  { t: Date.parse('2026-10-26T21:01:00-04:00'), kind: 'notice', headline: 'Still waiting on the first results from the City',
     body: 'The last extended voting place closed at 8:20 p.m., and the City hasn\'t posted any results yet. This page checks for new numbers every 30 seconds, so results will appear here on their own as soon as the City publishes them. No need to refresh.' },
-  { t: Date.parse('2026-10-26T21:12:00-04:00'), kind: 'notice', beforeResults: true, headline: 'City expected results around 9 p.m.; none posted yet',
+  { t: Date.parse('2026-10-26T21:12:00-04:00'), kind: 'notice', headline: 'City expected results around 9 p.m.; none posted yet',
     body: 'In a post at 8:53 p.m., the City of Toronto said some voting places still had voters in line, and that unofficial results would begin to be available at approximately 9 p.m. As of 9:12 p.m. none have been posted. They\'ll appear here as soon as the City publishes them.' },
 ];
 function withExtras(posts, now) {
