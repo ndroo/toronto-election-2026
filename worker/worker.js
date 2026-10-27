@@ -200,9 +200,22 @@ const SIGN_OFF = Date.parse('2026-10-27T01:00:00-04:00');
 const NOTICES = [
   { key: 'notice-extended-voting', kind: 'notice', headline: 'Voting extended at 11 locations, so results may take a little longer',
     body: 'After earlier disruptions, the City kept 11 voting places open past 8 p.m., the last until 8:20 p.m., in Wards 2, 5, 7, 8, 11, 13 and 16. Results may start arriving later than usual. Details at toronto.ca/elections.' },
-  { key: 'notice-still-waiting', kind: 'notice', beforeResults: true, headline: 'Still waiting on the first results from the City',
+];
+
+// Hand-written posts added by the Worker as it serves /feed.json, so they show up the moment this is deployed
+// (the Newsroom object can take minutes to pick up new code). t is when the post goes up; each slots in after
+// the newest Newsroom post at or before t. beforeResults posts are dropped once results have arrived.
+const EXTRA_POSTS = [
+  { t: Date.parse('2026-10-26T21:01:00-04:00'), kind: 'notice', beforeResults: true, headline: 'Still waiting on the first results from the City',
     body: 'The last extended voting place closed at 8:20 p.m., and the City hasn\'t posted any results yet. This page checks for new numbers every 30 seconds, so results will appear here on their own as soon as the City publishes them. No need to refresh.' },
 ];
+function withExtras(posts, now) {
+  const hasResults = posts.some((p) => p.kind !== 'notice' && !['pre-close', 'polls-closed'].includes(p.kind));
+  const heads = new Set(posts.map((p) => p.headline));
+  const extra = EXTRA_POSTS.filter((x) => x.t <= now && !heads.has(x.headline) && !(x.beforeResults && hasResults))
+    .map((x) => ({ id: Math.max(0, ...posts.filter((p) => p.t <= x.t).map((p) => p.id)) + 0.5, t: x.t, kind: x.kind, headline: x.headline, body: x.body }));
+  return [...posts, ...extra].sort((a, b) => b.id - a.id);
+}
 
 export class Newsroom extends DurableObject {
   constructor(ctx, env) {
@@ -233,7 +246,7 @@ export class Newsroom extends DurableObject {
         this.sql.exec('INSERT OR IGNORE INTO posts (key, t, kind, headline, body, ai) VALUES (?, ?, ?, ?, ?, 0)', e.id, now, e.kind, x.headline, x.body);
         return { signedOff: true };
       }
-      if (prev && prev.seq === String(all.seq || '') && posted.has('polls-closed')) return { unchanged: true };
+      if (prev && prev.seq === String(all.seq || '') && posted.has('polls-closed')) return { unchanged: true, code: 'n2' };
       const cur = snapshot(all, wbw, INCUMBENTS);
       const events = diff(prev, cur, now, posted);
       if (events.length) {
@@ -293,7 +306,7 @@ const FEED_CACHE_MS = 15000;
 let feedMemo = null;
 async function feed(env) {
   if (feedMemo && Date.now() - feedMemo.at < FEED_CACHE_MS) return feedMemo.body;
-  const posts = await env.NEWSROOM.get(env.NEWSROOM.idFromName('feed')).posts();
+  const posts = withExtras(await env.NEWSROOM.get(env.NEWSROOM.idFromName('feed')).posts(), Date.now());
   feedMemo = { at: Date.now(), body: JSON.stringify({ at: Date.now(), posts }) };
   return feedMemo.body;
 }
