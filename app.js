@@ -1508,8 +1508,10 @@
       store.set('mayorCelebrated', m.leader.name);
       celebrateMayor(m.leader.name, st);
     }
-    // Once the mayor's race is called: one thank-you card per browser, after the celebration has played.
-    if (m?.leader && !m.tied && CALLED.has(st) && st !== 'acclaimed' && store.get('thanksShown') !== m.leader.name && !thanksTimer) {
+    // Once the mayor's race is called: the thank-you card, after the celebration has played. At most once a day per
+    // browser (sooner only if the projected winner changes).
+    if (m?.leader && !m.tied && CALLED.has(st) && st !== 'acclaimed' && !thanksTimer
+      && (store.get('thanksShown') !== m.leader.name || Date.now() - int(store.get('thanksAt')) > 24 * 3600e3)) {
       thanksTimer = setTimeout(function tryThanks() {
         if (document.hidden || document.querySelector('dialog[open]')) { thanksTimer = setTimeout(tryThanks, 3000); return; }
         showThanks();
@@ -1522,6 +1524,7 @@
     if (!L) return;
     const st = m.call?.status;
     store.set('thanksShown', L.name);
+    store.set('thanksAt', String(Date.now()));
     const verb = st === 'official' ? 'wins' : st === 'decided' ? 'finishes first in' : 'is the projected winner of';
     $('#thanksResult').innerHTML = `${avatar('mayor', L.name, candColour(L.name))}
       <div><div class="thanks-kicker">${st === 'official' ? 'Official result' : 'Unofficial result'}</div>
@@ -1632,6 +1635,8 @@
   }
   function maybeWelcome() {
     if (welcomed || DEMO) return;
+    const ms = model?.mayor?.call?.status;
+    if (ms && CALLED.has(ms) && ms !== 'acclaimed') return; // the thank-you card greets people once the result is in
     welcomed = true;
     try { if (sessionStorage.getItem('welcomed')) return; sessionStorage.setItem('welcomed', '1'); } catch {}
     openWelcome();
