@@ -193,6 +193,9 @@ async function aiWrite(env, messages) {
   return typeof res?.response === 'string' ? JSON.parse(res.response) : res?.response;
 }
 
+// The Newsroom object holding this election's posts. A new name starts an empty feed (see docs/REVIVE.md).
+const FEED_ROOM = 'feed';
+
 // Live coverage ends here (Toronto time): one sign-off post, then no more posts. The results proxy keeps running.
 const SIGN_OFF = Date.parse('2026-10-27T01:00:00-04:00');
 
@@ -314,7 +317,7 @@ const FEED_CACHE_MS = 15000;
 let feedMemo = null;
 async function feed(env) {
   if (feedMemo && Date.now() - feedMemo.at < FEED_CACHE_MS) return feedMemo.body;
-  const posts = withExtras(await env.NEWSROOM.get(env.NEWSROOM.idFromName('feed')).posts(), Date.now());
+  const posts = withExtras(await env.NEWSROOM.get(env.NEWSROOM.idFromName(FEED_ROOM)).posts(), Date.now());
   feedMemo = { at: Date.now(), body: JSON.stringify({ at: Date.now(), posts }) };
   return feedMemo.body;
 }
@@ -330,7 +333,7 @@ export default {
   async fetch(req, env, ctx) {
     const url = new URL(req.url);
     if (url.pathname === '/tick' && env.STATS_KEY && url.searchParams.get('key') === env.STATS_KEY) {
-      try { return Response.json(await env.NEWSROOM.get(env.NEWSROOM.idFromName('feed')).tick()); } catch (err) { return Response.json({ error: String(err.message || err) }, { status: 502 }); }
+      try { return Response.json(await env.NEWSROOM.get(env.NEWSROOM.idFromName(FEED_ROOM)).tick()); } catch (err) { return Response.json({ error: String(err.message || err) }, { status: 502 }); }
     }
     if (url.pathname === '/stats' || url.pathname === '/stats.json') {
       try { return await stats(url, env); } catch (err) { return Response.json({ error: String(err.message || err) }, { status: 502 }); }
@@ -368,6 +371,6 @@ export default {
     }
   },
   async scheduled(controller, env, ctx) {
-    if (env.NEWSROOM) ctx.waitUntil(env.NEWSROOM.get(env.NEWSROOM.idFromName('feed')).tick().then((r) => console.log('feed tick', JSON.stringify(r))));
+    if (env.NEWSROOM) ctx.waitUntil(env.NEWSROOM.get(env.NEWSROOM.idFromName(FEED_ROOM)).tick().then((r) => console.log('feed tick', JSON.stringify(r))));
   },
 };

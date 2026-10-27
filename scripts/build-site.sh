@@ -8,6 +8,8 @@ cp index.html app.js wards.json photos.json incumbents.json og.png favicon.svg f
 cp -R photos dist/photos
 cp -R og dist/og
 cp worker/feed.js dist/worker/feed.js
+# Frozen final results (scripts/freeze.sh), read by the page when ARCHIVE is on.
+[ -d final ] && cp -R final dist/final
 # The page reloads itself when this stops matching the app.js?v= it loaded with (bump v= on every change).
 sed -n 's/.*app\.js?v=\([^"]*\)".*/\1/p' index.html > dist/version.txt
 echo "built dist/ ($(du -sh dist | cut -f1))"

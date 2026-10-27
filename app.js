@@ -30,9 +30,13 @@
     if (m) return [m[1], location.pathname.split('/').filter(Boolean)[0] || `${m[1]}.github.io`];
     return ['ndroo', 'toronto-election-2026'];
   })();
-  const POLL_MS = DEMO ? 9000 : 30000;
+  // After the election the results are frozen into final/ (scripts/freeze.sh) and served as static files, so the
+  // page needs no Worker and costs nothing to keep online. Set to false to go live again (see docs/REVIVE.md).
+  const ARCHIVE = true;
+  const POLL_MS = DEMO ? 9000 : ARCHIVE ? 10 * 60 * 1000 : 30000;
   const SOURCES = params.get('src')
     ? [{ id: 'custom', url: params.get('src') }]
+    : ARCHIVE && !DEMO ? [{ id: 'final', base: 'final' }]
     : [
         { id: 'worker', base: params.get('worker') || 'https://toronto-election-2026.andrewjohnmcgrath.workers.dev' },
         { id: 'api', url: `https://api.github.com/repos/${OWNER}/${REPO}/contents/bundle.json?ref=data`,
@@ -397,7 +401,7 @@
         if (src.base) {
           // Cloudflare Worker: CORS pass-through of the two City files, fetched in parallel.
           const get = async (f) => {
-            const q = f === 'unofficialresult.json' ? `?v=${VIEWER}` : '';
+            const q = f === 'unofficialresult.json' && src.id === 'worker' ? `?v=${VIEWER}` : '';
             const r = await fetch(`${src.base}/${f}${q}`, { cache: 'no-cache', signal: AbortSignal.timeout(10000) });
             if (!r.ok) throw new Error(`${src.id}: HTTP ${r.status}`);
             return { json: await r.json(), at: r.headers.get('X-Fetched-At') };
@@ -997,6 +1001,7 @@
       const relayAge = model.relayedAt ? Date.now() - model.relayedAt : 0;
       if (lastErr) { st.classList.add('error'); tx.textContent = `Connection problem - showing data from ${gen}`; }
       else if (!DEMO && relayAge > STALE_MS) { st.classList.add('stale'); tx.textContent = `Relay delayed - last checked ${ago(relayAge)}`; }
+      else if (r.complete && ARCHIVE && !DEMO) tx.textContent = 'Final unofficial results · all polls in';
       else if (r.complete) { st.classList.add('live'); tx.textContent = `All polls in · ${hm(model.generatedAt)}`; }
       else if (r.pollsReceived > 0) { st.classList.add('live'); tx.textContent = `Live · City updated ${model.generatedAt.toLocaleTimeString('en-CA', { timeZone: TZ, hour: 'numeric', minute: '2-digit', second: '2-digit' })}`; }
       else {
@@ -1011,7 +1016,7 @@
     }
     notice.hidden = !note; notice.innerHTML = note;
     // When this page last checked; the City's own update time is in the status text once results start.
-    $('#fresh').textContent = lastOk ? `checked ${ago(Date.now() - lastOk)}` : '';
+    $('#fresh').textContent = lastOk && !(ARCHIVE && !DEMO) ? `checked ${ago(Date.now() - lastOk)}` : '';
   }
 
   const COLS = [
@@ -1205,7 +1210,7 @@
     } else {
       if (Date.now() - feedAt < 55000) return;
       feedAt = Date.now();
-      const base = SOURCES.find((s) => s.id === 'worker')?.base;
+      const base = SOURCES.find((s) => s.base)?.base;
       const r = await fetch(`${base}/feed.json`, { cache: 'no-cache', signal: AbortSignal.timeout(10000) });
       if (!r.ok) return;
       posts = (await r.json()).posts || [];
@@ -1890,6 +1895,7 @@
     setInterval(tick, POLL_MS);
     setInterval(() => holdScroll(renderStatus), 1000);
     setTimeout(maybeWelcome, 4000); // still greet people if the first load is slow or fails
+    if (ARCHIVE && !DEMO) $('.tk-live').textContent = 'Recap'; // the night's posts, no longer live
     if (DEMO && params.get('preview') === 'thanks') setTimeout(() => { document.querySelectorAll('dialog[open]').forEach((d) => d.close()); showThanks(); }, 2500);
     if (DEMO && params.get('preview') === 'about') setTimeout(() => { document.querySelectorAll('dialog[open]').forEach((d) => d.close()); model.mayor.call = { ...model.mayor.call, status: 'projected' }; openWelcome(); }, 2500);
     document.addEventListener('visibilitychange', () => { if (!document.hidden) { tick(); checkVersion(); } });

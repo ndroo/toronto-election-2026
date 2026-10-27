@@ -22,6 +22,7 @@ new_sqlite_classes = ["Newsroom"]
 [ai]
 binding = "AI"
 
-# The live feed runs every minute over election night (UTC dates, so this covers the evening of Oct 26 in Toronto).
+# The live feed ran every minute over election night: crons = ["* * 26-29 10 *"] (UTC dates, so that covered the
+# evening of Oct 26 in Toronto). Off in archive mode; see docs/REVIVE.md.
 [triggers]
-crons = ["* * 26-29 10 *"]
+crons = []

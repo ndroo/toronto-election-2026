@@ -2,6 +2,8 @@
 
 Live at **https://torontoelections.andrewmcgrath.info/** (the old GitHub Pages address redirects there).
 
+**Archive mode since October 27, 2026:** the page shows the final unofficial results from `final/` as static files and needs no Worker. To run it for another election, see [docs/REVIVE.md](docs/REVIVE.md).
+
 Static page showing live unofficial results for mayor, council and school trustees, from the City of Toronto media feeds:
 
 - https://mediaresults.toronto.ca/results/unofficialresult.json
