@@ -112,6 +112,15 @@ const facts = (r) => ({
 
 const LEAD_CHANGE_GAP_MS = 15 * 60 * 1000; // at most one lead-change post per race in this window
 
+// End of live coverage: one closing post with where things stand. The page's numbers keep updating after it.
+export function signOff(cur) {
+  const council = Object.values(cur.races).filter((r) => r.kind === 'council');
+  return { id: 'sign-off', kind: 'sign-off', noAI: true, facts: {
+    pollsIn: cur.rec, polls: cur.polls, mayor: { ...facts(cur.races.mayor), status: cur.races.mayor.status },
+    councilCalled: council.filter((r) => CALLED.has(r.status) || r.status === 'acclaimed').length, councilRaces: council.length,
+  } };
+}
+
 export function diff(prev, cur, now, posted = new Set()) {
   const ev = [];
   cur.lc = { ...(prev?.lc || {}) }; // when each race last had a lead-change post
@@ -188,6 +197,14 @@ export function template(e) {
         'Once polls close, updates will appear here as the City reports results.',
       ];
       return { headline: `${left} until polls close`, body: `Voting is open until 8 p.m. ${lines[Math.round(4 - h) % lines.length] || lines[4]}` };
+    }
+    case 'sign-off': {
+      const m = f.mayor, Lm = m.leader;
+      const mayor = !Lm ? 'No votes for mayor have been reported yet.'
+        : m.status === 'decided' ? `${Lm.name} finishes first for mayor with ${pct1(Lm.pct)}, unofficially.`
+        : m.status === 'projected' ? `${Lm.name} is the projected winner for mayor with ${pct1(Lm.pct)}.`
+        : `${Lm.name} leads for mayor with ${pct1(Lm.pct)}, but the race hasn't been called.`;
+      return { headline: 'That\'s it for live coverage tonight', body: `${fmt(f.pollsIn)} of ${fmt(f.polls)} polls have reported. ${mayor} ${f.councilCalled} of ${f.councilRaces} council races have a winner or projected winner. The results on this page keep updating from the City's feed. Thanks for following along.` };
     }
     case 'polls-closed': return pick(e.id, [
       { headline: 'Polls are closed across Toronto', body: 'Voting ended at 8 p.m. The first unofficial results should start arriving from the City shortly.' },

@@ -8,7 +8,7 @@
 // shows live and 24-hour counts. Counting never delays or fails a feed response.
 import { DurableObject } from 'cloudflare:workers';
 import STATS_HTML from './stats.html';
-import { snapshot, diff, template, checkWriting } from './feed.js';
+import { snapshot, diff, template, checkWriting, signOff } from './feed.js';
 import INCUMBENTS from '../incumbents.json';
 
 const UPSTREAM = 'https://mediaresults.toronto.ca/results';
@@ -193,6 +193,9 @@ async function aiWrite(env, messages) {
   return typeof res?.response === 'string' ? JSON.parse(res.response) : res?.response;
 }
 
+// Live coverage ends here (Toronto time): one sign-off post, then no more posts. The results proxy keeps running.
+const SIGN_OFF = Date.parse('2026-10-27T01:00:00-04:00');
+
 // One-off posts written by hand, added once on the next tick (key keeps them from repeating).
 const NOTICES = [
   { key: 'notice-extended-voting', kind: 'notice', headline: 'Voting extended at 11 locations, so results may take a little longer',
@@ -222,6 +225,12 @@ export class Newsroom extends DurableObject {
       for (const n of NOTICES) this.sql.exec('INSERT OR IGNORE INTO posts (key, t, kind, headline, body, ai) VALUES (?, ?, ?, ?, ?, 0)', n.key, now, n.kind, n.headline, n.body);
       const prev = this.get('snap');
       const posted = new Set(this.sql.exec('SELECT key FROM posts').toArray().map((r) => r.key));
+      if (posted.has('sign-off')) return { signedOff: true };
+      if (now >= SIGN_OFF) {
+        const e = signOff(snapshot(all, wbw, INCUMBENTS)), x = template(e);
+        this.sql.exec('INSERT OR IGNORE INTO posts (key, t, kind, headline, body, ai) VALUES (?, ?, ?, ?, ?, 0)', e.id, now, e.kind, x.headline, x.body);
+        return { signedOff: true };
+      }
       if (prev && prev.seq === String(all.seq || '') && posted.has('polls-closed')) return { unchanged: true };
       const cur = snapshot(all, wbw, INCUMBENTS);
       const events = diff(prev, cur, now, posted);

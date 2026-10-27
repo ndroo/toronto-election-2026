@@ -1120,6 +1120,7 @@
     'pre-close': ['Polls open', ''], 'polls-closed': ['Polls closed', ''], 'first-results': ['First results', ''], milestone: ['Count', ''],
     'ward-started': ['Counting begins', ''], 'wards-started': ['Counting begins', ''], 'ward-finished': ['Count complete', ''],
     'lead-change': ['Lead change', 'k-lead'], 'close-race': ['Close race', 'k-close'], call: ['Race call', 'k-call'], 'trustee-calls': ['Trustee calls', 'k-call'],
+    notice: ['Update', ''], 'sign-off': ['Signing off', ''],
   };
   async function loadFeed() {
     if (params.get('src')) return;
