@@ -933,7 +933,7 @@
       const k = esc(`city|${c.name}`), col = candColour(c.name);
       const lead = i === 0 && r.leader && !r.tied;
       const tag = lead && CALLED.has(st) ? `<span class="tick tick-${st}" title="${CALL_LABEL[st].replace(/&[^;]+;\s*/g, '')}">&#10003;</span>` : '';
-      return `<div class="pc${lead ? ' first' : ''}" data-fk="${k}" title="${esc(c.name)}: ${fmt(c.votes)} votes (${pct(c.pct, 2)})">
+      return `<div class="pc${lead ? ' first' : ''}${lead && CALLED.has(st) ? ' won' : ''}" data-fk="${k}" title="${esc(c.name)}: ${fmt(c.votes)} votes (${pct(c.pct, 2)})">
         <span class="pc-rank">${counting ? i + 1 : ''}</span>${star(watchKey(r, c.name))}
         ${avatar('mayor', c.name, col)}
         <div class="pc-name">${esc(c.name)}</div>${tag}
@@ -1486,6 +1486,72 @@
     flashNow = false;
     animateChanges(snap, quiet);
     if (restoreY != null) { scrollTo(0, restoreY); restoreY = null; }
+    celebrateCalls();
+  }
+
+  // ---------- celebrations ----------
+  // Kept small on purpose. A ward gets one burst when its council race is called while you're watching (never on
+  // page load, at most 3 per update). The mayor's winner gets one bigger moment per browser, even if they
+  // arrive after the call, then the card just keeps a quiet gold outline. Off for reduced motion.
+  let callSeen = null;
+  function celebrateCalls() {
+    if (!model || !geo) return;
+    const now = {};
+    for (const [n, w] of Object.entries(model.wards)) now[n] = w.council?.call?.status;
+    if (callSeen) {
+      const fresh = Object.keys(now).filter((n) => CALLED.has(now[n]) && now[n] !== 'acclaimed' && !CALLED.has(callSeen[n]));
+      fresh.slice(0, 3).forEach((n, i) => setTimeout(() => wardConfetti(n), i * 450));
+    }
+    callSeen = now;
+    const m = model.mayor, st = m?.call?.status;
+    if (m?.leader && !m.tied && CALLED.has(st) && st !== 'acclaimed' && store.get('mayorCelebrated') !== m.leader.name && !document.hidden && !document.querySelector('dialog[open]')) {
+      store.set('mayorCelebrated', m.leader.name);
+      celebrateMayor(m.leader.name, st);
+    }
+  }
+  function wardConfetti(n) {
+    if (reduceMotion.matches || document.hidden || !geo.wards[n]) return;
+    const box = svg.parentNode.getBoundingClientRect();
+    const p = svg.createSVGPoint(); p.x = geo.wards[n].lx; p.y = geo.wards[n].ly;
+    const at = p.matrixTransform(svg.getScreenCTM());
+    if (at.x < box.left || at.y < box.top || at.x > box.right || at.y > box.bottom || box.bottom < 0 || box.top > innerHeight) return; // not on screen
+    burst(at.x, at.y, 36, 1);
+  }
+  function celebrateMayor(name, st) {
+    toast(`${name} ${st === 'projected' ? 'is the projected winner for mayor' : 'wins the mayor\'s race (unofficial)'}`);
+    if (reduceMotion.matches) return;
+    const card = $('#cityTop .pc.first');
+    const b = (card?.offsetParent ? card : $('#cityCard')).getBoundingClientRect();
+    if (b.bottom < 0 || b.top > innerHeight) return;
+    card?.classList.add('celebrate');
+    burst(b.left + b.width / 2, b.top + 10, 70, 1.5);
+    setTimeout(() => { burst(b.left + 6, b.top + 20, 40, 1.2); burst(b.right - 6, b.top + 20, 40, 1.2); }, 350);
+  }
+  let confettiBits = [], confettiCanvas = null;
+  function burst(x, y, count, power) {
+    if (!confettiCanvas) { confettiCanvas = document.createElement('canvas'); confettiCanvas.className = 'confetti'; document.body.appendChild(confettiCanvas); }
+    const colours = ['#f5c242', '#f5c242', '#e8a317', css('--s1'), css('--ink')];
+    const idle = !confettiBits.length;
+    for (let i = 0; i < count; i++) {
+      const a = -Math.PI / 2 + (Math.random() - 0.5) * 2.2, v = (2.2 + Math.random() * 3.2) * power;
+      confettiBits.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, r: Math.random() * 6.3, vr: (Math.random() - 0.5) * 0.4,
+        w: 3 + Math.random() * 3, h: 6 + Math.random() * 4, c: colours[i % colours.length], t: 0, life: 70 + Math.random() * 30 * power });
+    }
+    if (idle) requestAnimationFrame(confettiFrame);
+  }
+  function confettiFrame() {
+    const cv = confettiCanvas, dpr = devicePixelRatio || 1, W = innerWidth, H = innerHeight;
+    if (cv.width !== Math.round(W * dpr) || cv.height !== Math.round(H * dpr)) { cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); }
+    const g = cv.getContext('2d');
+    g.setTransform(dpr, 0, 0, dpr, 0, 0);
+    g.clearRect(0, 0, W, H);
+    confettiBits = confettiBits.filter((b) => ++b.t < b.life);
+    for (const b of confettiBits) {
+      b.vy += 0.12; b.vx *= 0.985; b.vy *= 0.985; b.x += b.vx; b.y += b.vy; b.r += b.vr;
+      g.save(); g.globalAlpha = Math.min(1, (b.life - b.t) / 25); g.translate(b.x, b.y); g.rotate(b.r);
+      g.fillStyle = b.c; g.fillRect(-b.w / 2, -b.h / 2, b.w, b.h * Math.abs(Math.cos(b.r * 1.7))); g.restore();
+    }
+    if (confettiBits.length) requestAnimationFrame(confettiFrame); else g.clearRect(0, 0, W, H);
   }
 
   // ---------- new deploys ----------
