@@ -1413,6 +1413,30 @@
     holdScroll(() => { renderStatus(); renderStats(); renderMap(); renderCity(); renderWard(); renderTable(); renderBoards(); renderWatch(); renderFeed(); renderTip(); });
     flashNow = false;
     animateChanges(snap, quiet);
+    if (restoreY != null) { scrollTo(0, restoreY); restoreY = null; }
+  }
+
+  // ---------- new deploys ----------
+  // The build writes version.txt; when it no longer matches the app.js?v= this page loaded with, reload so
+  // everyone runs the latest code. Waits for open dialogs to close and keeps the scroll position.
+  const BUILD = new URL(document.querySelector('script[src*="app.js"]')?.src || location.href).searchParams.get('v');
+  let restoreY = null;
+  try { const y = sessionStorage.getItem('reloadY'); if (y != null) { restoreY = +y; sessionStorage.removeItem('reloadY'); } } catch {}
+  let reloading = false;
+  function reloadWhenIdle() {
+    if (reloading) return;
+    if (!document.hidden && document.querySelector('dialog[open]:not(#welcome)')) { setTimeout(reloadWhenIdle, 5000); return; }
+    reloading = true;
+    try { sessionStorage.setItem('reloadY', String(Math.round(scrollY))); } catch {}
+    location.reload();
+  }
+  async function checkVersion() {
+    if (!BUILD || reloading) return;
+    try {
+      const r = await fetch('version.txt', { cache: 'no-store' });
+      const v = r.ok ? (await r.text()).trim() : '';
+      if (/^[\w.-]{1,40}$/.test(v) && v !== BUILD) reloadWhenIdle();
+    } catch {}
   }
 
   // ---------- welcome dialog ----------
@@ -1681,6 +1705,7 @@
     setInterval(tick, POLL_MS);
     setInterval(() => holdScroll(renderStatus), 1000);
     setTimeout(maybeWelcome, 4000); // still greet people if the first load is slow or fails
-    document.addEventListener('visibilitychange', () => { if (!document.hidden) tick(); });
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) { tick(); checkVersion(); } });
+    setInterval(checkVersion, 120000);
   });
 })();
