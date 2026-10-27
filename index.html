@@ -517,6 +517,11 @@ svg#map .me-halo { fill: var(--proj); opacity: .25; transform-box: fill-box; tra
 .btn.tcc-btn { background: #d8321f !important; border-color: #d8321f !important; color: #fff !important; }
 .btn.tcc-btn:hover { background: #c92a1c !important; filter: none; }
 @media (max-width: 420px) { .thanks-result, .thanks-body { padding-left: 16px; padding-right: 16px; } .tcc { margin-left: 16px; margin-right: 16px; } .thanks-foot { padding: 12px 16px 14px; } .thanks-foot .btn { flex: 1; text-align: center; } .thanks-close { flex: none; } }
+#welcome .thanks-result { margin: -22px -24px 16px; }
+#welcome .tcc { margin: 4px 0 12px; }
+#welcome .tcc[hidden], #welcome .thanks-result[hidden] { display: none; }
+#welcome a.tcc { color: var(--tcc-ink) !important; }
+@media (max-width: 500px), (max-height: 700px) { #welcome .thanks-result { margin: -14px -18px 12px; } }
 /* Welcome dialog */
 #welcome { border: 1px solid var(--border); border-radius: 14px; padding: 0; width: min(520px, calc(100vw - 32px)); background: var(--surface); color: var(--ink); box-shadow: 0 24px 64px rgba(0,0,0,.3); }
 #welcome::backdrop { background: rgba(0,0,0,.35); backdrop-filter: blur(2px); }
@@ -849,6 +854,7 @@ body.watching .toast { bottom: 120px; }
 <dialog id="welcome" class="fade-dlg" aria-labelledby="welcomeTitle">
   <form method="dialog">
    <div class="welcome-body">
+    <div class="thanks-result" id="welcomeResult" hidden></div>
     <h2 id="welcomeTitle">Toronto 2026 election results</h2>
     <p>Live, unofficial results for mayor, city council and school trustees, straight from the City of Toronto's results feed. An ad-free page by <a href="https://andrewmcgrath.info">Andrew McGrath</a>, <a href="https://github.com/ndroo/toronto-election-2026">open source on GitHub</a>.</p>
     <ul class="welcome-list">
@@ -858,6 +864,12 @@ body.watching .toast { bottom: 120px; }
       <li>Unofficial until certified by the City Clerk. Official results: <a href="https://www.toronto.ca/city-government/elections/">toronto.ca/elections</a>.</li>
     </ul>
     <div id="welcomeWait" class="welcome-wait" aria-live="polite" hidden></div>
+    <a class="tcc" id="welcomeTcc" hidden href="https://triplec.fm/?ref=torontoelections" target="_blank" rel="noopener">
+      <span class="tcc-logo"><svg viewBox="0 0 512 512" aria-hidden="true"><rect width="512" height="512" rx="112" fill="#ff4d3d"/><g transform="translate(256 256) scale(0.8) translate(-256 -256)"><g fill="none" stroke="#fff" stroke-width="34" stroke-linecap="round"><path d="M353.6 192.4 A90 90 0 1 0 353.6 319.6"/><path d="M394.7 151.3 A148 148 0 1 0 394.7 360.7"/><path d="M435.7 110.3 A206 206 0 1 0 435.7 401.7"/></g><path fill="#fff" transform="translate(296 254) scale(0.03700) translate(-4800 -2330)" d="M4890 4430l-45-863a95 95 0 0 1 111-98l859 151-116-320a65 65 0 0 1 20-73l941-762-212-99a65 65 0 0 1-34-79l186-572-542 115a65 65 0 0 1-73-38l-105-247-423 454a65 65 0 0 1-111-57l204-1052-327 189a65 65 0 0 1-91-27l-332-652-332 652a65 65 0 0 1-91 27l-327-189 204 1052a65 65 0 0 1-111 57l-423-454-105 247a65 65 0 0 1-73 38l-542-115 186 572a65 65 0 0 1-34 79l-212 99 941 762a65 65 0 0 1 20 73l-116 320 859-151a95 95 0 0 1 111 98l-45 863z"/></g></svg></span>
+      <span class="tcc-text"><span class="tcc-kicker">My next project</span><b>Triple C</b><span class="tcc-tag">Champions of new Canadian music</span>
+        <span class="tcc-pitch">A not-for-profit radio station for new Canadian music, plus a gig guide to shows across the country. Artists can send in their music.</span></span>
+    </a>
+
     <p class="welcome-fine">Provided as is, without representations or warranties.</p>
    </div>
    <div class="welcome-foot">
@@ -895,6 +907,6 @@ body.watching .toast { bottom: 120px; }
 
 <div id="tip" role="tooltip"></div>
 <div id="callTip" role="tooltip"></div>
-<script src="app.js?v=20261026-fl11"></script>
+<script src="app.js?v=20261026-fl12"></script>
 </body>
 </html>

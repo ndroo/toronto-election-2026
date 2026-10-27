@@ -1525,12 +1525,17 @@
     const st = m.call?.status;
     store.set('thanksShown', L.name);
     store.set('thanksAt', String(Date.now()));
+    $('#thanksResult').innerHTML = resultHTML();
+    $('#thanks').showModal();
+  }
+  // The mayor's result as shown at the top of the thank-you card and, once called, the About box.
+  function resultHTML() {
+    const m = model.mayor, L = m.leader, st = m.call?.status;
     const verb = st === 'official' ? 'wins' : st === 'decided' ? 'finishes first in' : 'is the projected winner of';
-    $('#thanksResult').innerHTML = `${avatar('mayor', L.name, candColour(L.name))}
+    return `${avatar('mayor', L.name, candColour(L.name))}
       <div><div class="thanks-kicker">${st === 'official' ? 'Official result' : 'Unofficial result'}</div>
       <div class="thanks-head"><b>${esc(L.name)}</b> ${verb} the race for mayor</div>
       <div class="thanks-sub">${pct(L.pct)} of the vote, with ${fmt(m.pollsReceived)} of ${fmt(m.polls)} polls reporting</div></div>`;
-    $('#thanks').showModal();
   }
   function wardConfetti(n) {
     if (reduceMotion.matches || document.hidden || !geo.wards[n]) return;
@@ -1647,6 +1652,11 @@
     if (!dlg?.showModal || dlg.open) return;
     delete dlg.dataset.phase;
     clearInterval(welcomeTimer);
+    // Once the mayor's race is called, About also shows the result and the Triple C card.
+    const m = model?.mayor, st = m?.call?.status;
+    const called = !!(m?.leader && !m.tied && CALLED.has(st) && st !== 'acclaimed');
+    $('#welcomeResult').hidden = !called; $('#welcomeTcc').hidden = !called;
+    if (called) $('#welcomeResult').innerHTML = resultHTML();
     dlg.showModal();
     renderWelcome();
     welcomeTimer = setInterval(renderWelcome, 1000);
@@ -1869,6 +1879,7 @@
     setInterval(() => holdScroll(renderStatus), 1000);
     setTimeout(maybeWelcome, 4000); // still greet people if the first load is slow or fails
     if (DEMO && params.get('preview') === 'thanks') setTimeout(() => { document.querySelectorAll('dialog[open]').forEach((d) => d.close()); showThanks(); }, 2500);
+    if (DEMO && params.get('preview') === 'about') setTimeout(() => { document.querySelectorAll('dialog[open]').forEach((d) => d.close()); model.mayor.call = { ...model.mayor.call, status: 'projected' }; openWelcome(); }, 2500);
     document.addEventListener('visibilitychange', () => { if (!document.hidden) { tick(); checkVersion(); } });
     setInterval(checkVersion, 120000);
   });
