@@ -200,6 +200,8 @@ const SIGN_OFF = Date.parse('2026-10-27T01:00:00-04:00');
 const NOTICES = [
   { key: 'notice-extended-voting', kind: 'notice', headline: 'Voting extended at 11 locations, so results may take a little longer',
     body: 'After earlier disruptions, the City kept 11 voting places open past 8 p.m., the last until 8:20 p.m., in Wards 2, 5, 7, 8, 11, 13 and 16. Results may start arriving later than usual. Details at toronto.ca/elections.' },
+  { key: 'notice-still-waiting', kind: 'notice', beforeResults: true, headline: 'Still waiting on the first results from the City',
+    body: 'The last extended voting place closed at 8:20 p.m., and the City hasn\'t posted any results yet. This page checks for new numbers every 30 seconds, so results will appear here on their own as soon as the City publishes them. No need to refresh.' },
 ];
 
 export class Newsroom extends DurableObject {
@@ -222,7 +224,7 @@ export class Newsroom extends DurableObject {
       const get = async (f) => { const r = await fetch(`${base}/${f}`, { signal: AbortSignal.timeout(10000) }); if (!r.ok) throw new Error(`upstream ${r.status}`); return r.json(); };
       const [all, wbw] = await Promise.all([get('unofficialresult.json'), get('unofficialresult-wardbyward.json')]);
       const now = Date.now();
-      for (const n of NOTICES) this.sql.exec('INSERT OR IGNORE INTO posts (key, t, kind, headline, body, ai) VALUES (?, ?, ?, ?, ?, 0)', n.key, now, n.kind, n.headline, n.body);
+      for (const n of NOTICES) if (!(n.beforeResults && (+all.office?.[0]?.ward?.[0]?.pollsReceived || this.get('snap')?.rec))) this.sql.exec('INSERT OR IGNORE INTO posts (key, t, kind, headline, body, ai) VALUES (?, ?, ?, ?, ?, 0)', n.key, now, n.kind, n.headline, n.body);
       const prev = this.get('snap');
       const posted = new Set(this.sql.exec('SELECT key FROM posts').toArray().map((r) => r.key));
       if (posted.has('sign-off')) return { signedOff: true };
