@@ -167,6 +167,11 @@ main {
 .modes button + button { border-left: 1px solid var(--border); }
 .modes button[aria-pressed="true"] { background: var(--ink); color: var(--surface); }
 .mapwrap { position: relative; }
+.call-chip { position: absolute; z-index: 3; transform: translate(-50%, -130%); pointer-events: none; white-space: nowrap; max-width: 220px; overflow: hidden; text-overflow: ellipsis;
+  background: var(--ink); color: var(--surface); font: 600 12px/1.2 system-ui, -apple-system, "Segoe UI", sans-serif; padding: 5px 9px; border-radius: 999px; box-shadow: 0 4px 14px rgba(0,0,0,.25); animation: chip-life 5.2s ease both; }
+.call-chip b { color: #f5c242; margin-right: 3px; }
+@keyframes chip-life { 0% { opacity: 0; transform: translate(-50%, -100%) scale(.85); } 8% { opacity: 1; transform: translate(-50%, -130%) scale(1); } 80% { opacity: 1; transform: translate(-50%, -150%); } 100% { opacity: 0; transform: translate(-50%, -170%); } }
+@media (prefers-reduced-motion: reduce) { .call-chip { animation: none; } }
 .zoom-ctl { position: absolute; top: 6px; right: 6px; display: flex; flex-direction: column; gap: 4px; z-index: 2; }
 .zoom-ctl button { min-width: 32px; height: 32px; padding: 0 8px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--ink-2); font: 600 17px/1 system-ui, -apple-system, "Segoe UI", sans-serif; cursor: pointer; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
 .zoom-ctl button:hover:not(:disabled) { color: var(--ink); background: var(--surface-2); }
@@ -907,6 +912,6 @@ body.watching .toast { bottom: 120px; }
 
 <div id="tip" role="tooltip"></div>
 <div id="callTip" role="tooltip"></div>
-<script src="app.js?v=20261026-fl12"></script>
+<script src="app.js?v=20261026-fl13"></script>
 </body>
 </html>

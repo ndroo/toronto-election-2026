@@ -1501,6 +1501,9 @@
     if (callSeen) {
       const fresh = Object.keys(now).filter((n) => CALLED.has(now[n]) && now[n] !== 'acclaimed' && !CALLED.has(callSeen[n]));
       fresh.slice(0, 3).forEach((n, i) => setTimeout(() => wardConfetti(n), i * 450));
+      // Say what the confetti is for: the feed post about it can take a minute or two to arrive.
+      const who = (n) => `Ward ${n} to ${model.wards[n].council.leader?.name || ''}${now[n] === 'projected' ? ' (projected)' : ''}`;
+      if (fresh.length) toast(`${fresh.length === 1 ? 'Race called' : `${fresh.length} races called`} \u00b7 ${fresh.slice(0, 2).map(who).join(', ')}${fresh.length > 2 ? ` and ${fresh.length - 2} more` : ''}`, 6000);
     }
     callSeen = now;
     const m = model.mayor, st = m?.call?.status;
@@ -1544,9 +1547,18 @@
     const at = p.matrixTransform(svg.getScreenCTM());
     if (at.x < box.left || at.y < box.top || at.x > box.right || at.y > box.bottom || box.bottom < 0 || box.top > innerHeight) return; // not on screen
     burst(at.x, at.y, 36, 1);
+    // A label on the ward for a few seconds, so it's clear which race the confetti is for.
+    const name = model.wards[n]?.council?.leader?.name;
+    if (!name) return;
+    const chip = document.createElement('div');
+    chip.className = 'call-chip';
+    chip.innerHTML = `<b>&#10003; Ward ${esc(n)}</b> ${esc(name)}`;
+    chip.style.left = `${at.x - box.left}px`; chip.style.top = `${at.y - box.top}px`;
+    svg.parentNode.appendChild(chip);
+    setTimeout(() => chip.remove(), 5200);
   }
   function celebrateMayor(name, st) {
-    toast(`${name} ${st === 'projected' ? 'is the projected winner for mayor' : 'wins the mayor\'s race (unofficial)'}`);
+    toast(`${name} ${st === 'projected' ? 'is the projected winner for mayor' : 'wins the mayor\'s race (unofficial)'}`, 6000);
     if (reduceMotion.matches) return;
     const card = $('#cityTop .pc.first');
     const b = (card?.offsetParent ? card : $('#cityCard')).getBoundingClientRect();
@@ -1764,7 +1776,7 @@
     ? '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5v8.5M5 4.5l3-3 3 3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M5.5 7H4a1 1 0 0 0-1 1v5.5a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V8a1 1 0 0 0-1-1h-1.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>'
     : '<svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="12" cy="3.5" r="2" fill="currentColor"/><circle cx="4" cy="8" r="2" fill="currentColor"/><circle cx="12" cy="12.5" r="2" fill="currentColor"/><path d="M10.2 4.5 5.8 7M5.8 9l4.4 2.5" stroke="currentColor" stroke-width="1.4"/></svg>';
   let toastTimer;
-  const toast = (msg) => { const t = $('#toast'); t.textContent = msg; t.classList.add('on'); clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('on'), 2200); };
+  const toast = (msg, ms = 2200) => { const t = $('#toast'); t.textContent = msg; t.classList.add('on'); clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('on'), ms); };
   // Save the map as a PNG: the current colouring, a title, the count so far, a key and the address.
   // Phones get the native share sheet with the image; elsewhere it downloads.
   const MODE_TITLE = { mayor: 'Mayor: who leads each ward', council: "Council: leader's margin", reporting: 'Polls reporting', turnout: 'Turnout' };
