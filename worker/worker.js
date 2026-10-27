@@ -214,8 +214,14 @@ const EXTRA_POSTS = [
 function withExtras(posts, now) {
   const hasResults = posts.some((p) => p.kind !== 'notice' && !['pre-close', 'polls-closed'].includes(p.kind));
   const heads = new Set(posts.map((p) => p.headline));
-  const extra = EXTRA_POSTS.filter((x) => x.t <= now && !heads.has(x.headline) && !(x.beforeResults && hasResults))
-    .map((x) => ({ id: Math.max(0, ...posts.filter((p) => p.t <= x.t).map((p) => p.id)) + 0.5, t: x.t, kind: x.kind, headline: x.headline, body: x.body }));
+  const picked = EXTRA_POSTS.filter((x) => x.t <= now && !heads.has(x.headline) && !(x.beforeResults && hasResults))
+    .sort((a, b) => a.t - b.t);
+  const after = new Map(); // several extras after the same post get 0.5, 0.51, 0.52... so each id is unique and in order
+  const extra = picked.map((x) => {
+    const base = Math.max(0, ...posts.filter((p) => p.t <= x.t).map((p) => p.id));
+    const k = after.get(base) || 0; after.set(base, k + 1);
+    return { id: base + 0.5 + k / 100, t: x.t, kind: x.kind, headline: x.headline, body: x.body };
+  });
   return [...posts, ...extra].sort((a, b) => b.id - a.id);
 }
 
